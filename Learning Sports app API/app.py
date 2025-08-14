@@ -2,14 +2,17 @@ import os
 import pickle
 import pandas as pd
 from flask import Flask, request, jsonify
+from flask_cors import CORS # Import the CORS library
 
 # --- INITIALIZATION ---
 # Initialize the Flask application
 app = Flask(__name__)
+# --- FIX: Enable CORS ---
+# This will allow your front-end dashboard to make requests to this API.
+CORS(app)
 
 # --- LOAD THE TRAINED MODEL ---
 # The model is loaded once when the API server starts.
-# This is much more efficient than loading it for every request.
 model_path = 'mlb_total_runs_model.pkl'
 try:
     with open(model_path, 'rb') as file:
@@ -43,11 +46,9 @@ def predict():
         data = request.get_json()
         
         # Convert the incoming data into a pandas DataFrame
-        # This is necessary because the model was trained on a DataFrame.
         features_df = pd.DataFrame([data])
         
         # Ensure the columns are in the correct order
-        # This is a crucial step to prevent errors.
         required_features = [
             'home_rolling_avg_hits', 'home_rolling_avg_homers',
             'away_rolling_avg_hits', 'away_rolling_avg_homers',
@@ -61,7 +62,7 @@ def predict():
         # Make a prediction using the loaded model
         prediction = model.predict(features_df)
         
-        # The model returns a numpy array, so we extract the first element
+        # Extract the first element
         predicted_runs = float(prediction[0])
         
         # Return the prediction in a JSON response
@@ -75,12 +76,11 @@ def predict():
 def predict_test():
     """
     A simple test endpoint to verify the model can make a prediction.
-    You can visit this URL in a browser.
     """
     if model is None:
         return jsonify({'error': 'Model is not loaded.'}), 500
         
-    # Create a sample data point with plausible values
+    # Create a sample data point
     test_data = {
         'home_rolling_avg_hits': 8.5, 'home_rolling_avg_homers': 1.2,
         'away_rolling_avg_hits': 7.9, 'away_rolling_avg_homers': 1.1,
@@ -102,6 +102,5 @@ def predict_test():
 
 # This is required for Render's Gunicorn server
 if __name__ == '__main__':
-    # The host must be set to '0.0.0.0' to be accessible from outside the container
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
