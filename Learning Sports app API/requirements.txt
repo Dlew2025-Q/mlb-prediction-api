@@ -7,3 +7,4 @@ Flask-Cors
 psycopg2-binary
 sqlalchemy
 numpy
+python-dotenv
