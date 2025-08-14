@@ -30,79 +30,125 @@ if os.path.exists(model_path):
 else:
     print(f"Error: Model file not found at '{model_path}'.")
 
-# --- DATA CACHING ---
+# --- DATA CACHING & PRE-CALCULATION ---
 games_df = None
 batter_stats_df = None
 pitcher_stats_df = None
+team_features = None # Will store the final pre-calculated features
 
-def load_data_from_db():
-    """Loads all necessary data from the database into memory."""
-    global games_df, batter_stats_df, pitcher_stats_df
+TEAM_NAME_MAP = { "ARI": "ARI", "ATL": "ATL", "BAL": "BAL", "BOS": "BOS", "CHC": "CHC", "CHW": "CHW", "CIN": "CIN", "CLE": "CLE", "COL": "COL", "DET": "DET", "HOU": "HOU", "KCR": "KC", "KC": "KC", "LAA": "LAA", "LAD": "LAD", "MIA": "MIA", "MIL": "MIL", "MIN": "MIN", "NYM": "NYM", "NYY": "NYY", "OAK": "OAK", "PHI": "PHI", "PIT": "PIT", "SDP": "SD", "SD": "SD", "SFG": "SF", "SF": "SF", "SEA": "SEA", "STL": "STL", "TBR": "TB", "TB": "TB", "TEX": "TEX", "TOR": "TOR", "WSN": "WSH", "WAS": "WSH", "Arizona Diamondbacks": "ARI", "Atlanta Braves": "ATL", "Baltimore Orioles": "BAL", "Boston Red Sox": "BOS", "Chicago Cubs": "CHC", "Chicago White Sox": "CHW", "Cincinnati Reds": "CIN", "Cleveland Guardians": "CLE", "Colorado Rockies": "COL", "Detroit Tigers": "DET", "Houston Astros": "HOU", "Kansas City Royals": "KC", "Los Angeles Angels": "LAA", "Los Angeles Dodgers": "LAD", "Miami Marlins": "MIA", "Milwaukee Brewers": "MIL", "Minnesota Twins": "MIN", "New York Mets": "NYM", "New York Yankees": "NYY", "Oakland Athletics": "OAK", "Philadelphia Phillies": "PHI", "Pittsburgh Pirates": "PIT", "San Diego Padres": "SD", "San Francisco Giants": "SF", "Seattle Mariners": "SEA", "St. Louis Cardinals": "STL", "Tampa Bay Rays": "TB", "Texas Rangers": "TEX", "Toronto Blue Jays": "TOR", "Washington Nationals": "WSH", "Diamondbacks": "ARI", "Braves": "ATL", "Orioles": "BAL", "Red Sox": "BOS", "Cubs": "CHC", "White Sox": "CHW", "Reds": "CIN", "Guardians": "CLE", "Indians": "CLE", "Rockies": "COL", "Angels": "LAA", "Dodgers": "LAD", "Marlins": "MIA", "Brewers": "MIL", "Twins": "MIN", "Mets": "NYM", "Yankees": "NYY", "Athletics": "OAK", "Phillies": "PHI", "Pirates": "PIT", "Padres": "SD", "Giants": "SF", "Mariners": "SEA", "Cardinals": "STL", "Rays": "TB", "Rangers": "TEX", "Blue Jays": "TOR", "Nationals": "WSH", "ARZ": "ARI", "CWS": "CHW", "METS": "NYM", "YANKEES": "NYY", "ATH": "OAK" }
+
+def calculate_all_features():
+    """
+    Loads all data and runs the full feature engineering pipeline,
+    caching the final features for each team.
+    """
+    global games_df, batter_stats_df, pitcher_stats_df, team_features
     if engine is None:
-        print("Database not connected. Cannot load data.")
+        print("Database not connected. Cannot calculate features.")
         return
     try:
         print("Loading historical data from database...")
         games_df = pd.read_sql("SELECT * FROM games", engine)
         batter_stats_df = pd.read_sql("SELECT * FROM batter_stats", engine)
         pitcher_stats_df = pd.read_sql("SELECT * FROM pitcher_stats", engine)
-        print("All historical data loaded into memory.")
+
+        # --- Data Cleaning ---
+        games_df['game_id'] = games_df['game_id'].astype(str)
+        batter_stats_df['game_id'] = batter_stats_df['game_id'].astype(str)
+        pitcher_stats_df['game_id'] = pitcher_stats_df['game_id'].astype(str)
+        stat_game_ids = set(batter_stats_df['game_id'])
+        games_df = games_df[games_df['game_id'].isin(stat_game_ids)].copy()
+        games_df['home_team'] = games_df['home_team'].str.strip().map(TEAM_NAME_MAP)
+        games_df['away_team'] = games_df['away_team'].str.strip().map(TEAM_NAME_MAP)
+        batter_stats_df['team'] = batter_stats_df['team'].str.strip().map(TEAM_NAME_MAP)
+        pitcher_stats_df['team'] = pitcher_stats_df['team'].str.strip().map(TEAM_NAME_MAP)
+        
+        # --- Feature Engineering ---
+        print("Starting feature engineering for all teams...")
+        
+        # Team Hitting
+        batter_agg = batter_stats_df.groupby(['game_id', 'team']).agg(total_hits=('hits', 'sum'), total_homers=('home_runs', 'sum')).reset_index()
+        team_game_stats = pd.merge(games_df[['game_id', 'commence_time']], batter_agg, on='game_id', how='left')
+        team_game_stats.sort_values('commence_time', inplace=True)
+        team_game_stats.dropna(subset=['team'], inplace=True)
+        team_game_stats['rolling_avg_hits'] = team_game_stats.groupby('team')['total_hits'].transform(lambda x: x.shift(1).rolling(10, min_periods=1).mean())
+        team_game_stats['rolling_avg_homers'] = team_game_stats.groupby('team')['total_homers'].transform(lambda x: x.shift(1).rolling(10, min_periods=1).mean())
+        
+        # Starters
+        starters = pitcher_stats_df.loc[pitcher_stats_df.groupby(['game_id', 'team'])['innings_pitched'].idxmax()]
+        starters = pd.merge(starters, games_df[['game_id', 'commence_time']], on='game_id', how='left')
+        starters.sort_values('commence_time', inplace=True)
+        epsilon = 1e-6
+        rolling_ip = starters.groupby('player_name')['innings_pitched'].transform(lambda x: x.shift(1).rolling(5, min_periods=1).mean())
+        rolling_er = starters.groupby('player_name')['earned_runs'].transform(lambda x: x.shift(1).rolling(5, min_periods=1).mean())
+        starters['starter_rolling_era'] = (rolling_er * 9) / (rolling_ip + epsilon)
+        starters['starter_rolling_ks'] = starters.groupby('player_name')['strikeouts'].transform(lambda x: x.shift(1).rolling(5, min_periods=1).mean())
+        
+        # Bullpen
+        bullpen_df = pitcher_stats_df[~pitcher_stats_df.index.isin(starters.index)]
+        bullpen_agg = bullpen_df.groupby(['game_id', 'team']).agg(bullpen_ip=('innings_pitched', 'sum'), bullpen_er=('earned_runs', 'sum')).reset_index()
+        bullpen_agg = pd.merge(games_df[['game_id', 'commence_time']], bullpen_agg, on='game_id', how='left')
+        bullpen_agg.sort_values('commence_time', inplace=True)
+        bullpen_agg.dropna(subset=['team'], inplace=True)
+        rolling_bullpen_ip = bullpen_agg.groupby('team')['bullpen_ip'].transform(lambda x: x.shift(1).rolling(10, min_periods=1).mean())
+        rolling_bullpen_er = bullpen_agg.groupby('team')['bullpen_er'].transform(lambda x: x.shift(1).rolling(10, min_periods=1).mean())
+        bullpen_agg['bullpen_rolling_era'] = (rolling_bullpen_er * 9) / (rolling_bullpen_ip + epsilon)
+
+        # Park Factors
+        games_df['total_runs'] = games_df['home_score'] + games_df['away_score']
+        park_factors = games_df.groupby('home_team')['total_runs'].mean().reset_index().rename(columns={'home_team': 'team', 'total_runs': 'park_factor_avg_runs'})
+        
+        # --- Cache the latest features for each team ---
+        team_features = team_game_stats.groupby('team').last().reset_index()
+        team_features = pd.merge(team_features, park_factors, on='team', how='left')
+        
+        # This is a simplification; a real app would also cache starter and bullpen data
+        # For now, we'll use team-level averages as a proxy
+        latest_starters = starters.groupby('team').last().reset_index()
+        team_features = pd.merge(team_features, latest_starters[['team', 'starter_rolling_era', 'starter_rolling_ks']], on='team', how='left')
+        
+        latest_bullpen = bullpen_agg.groupby('team').last().reset_index()
+        team_features = pd.merge(team_features, latest_bullpen[['team', 'bullpen_rolling_era']], on='team', how='left')
+        
+        team_features.fillna(0, inplace=True)
+        print("Feature calculation complete. API is ready for predictions.")
+
     except Exception as e:
-        print(f"Error loading data from database: {e}")
+        print(f"An error occurred during feature calculation: {e}")
 
-# Load data when the app starts
-load_data_from_db()
-
-# --- TEAM NAME MAP (Should match the one from training) ---
-TEAM_NAME_MAP = { "ARI": "ARI", "ATL": "ATL", "BAL": "BAL", "BOS": "BOS", "CHC": "CHC", "CHW": "CHW", "CIN": "CIN", "CLE": "CLE", "COL": "COL", "DET": "DET", "HOU": "HOU", "KCR": "KC", "KC": "KC", "LAA": "LAA", "LAD": "LAD", "MIA": "MIA", "MIL": "MIL", "MIN": "MIN", "NYM": "NYM", "NYY": "NYY", "OAK": "OAK", "PHI": "PHI", "PIT": "PIT", "SDP": "SD", "SD": "SD", "SFG": "SF", "SF": "SF", "SEA": "SEA", "STL": "STL", "TBR": "TB", "TB": "TB", "TEX": "TEX", "TOR": "TOR", "WSN": "WSH", "WAS": "WSH", "Arizona Diamondbacks": "ARI", "Atlanta Braves": "ATL", "Baltimore Orioles": "BAL", "Boston Red Sox": "BOS", "Chicago Cubs": "CHC", "Chicago White Sox": "CHW", "Cincinnati Reds": "CIN", "Cleveland Guardians": "CLE", "Colorado Rockies": "COL", "Detroit Tigers": "DET", "Houston Astros": "HOU", "Kansas City Royals": "KC", "Los Angeles Angels": "LAA", "Los Angeles Dodgers": "LAD", "Miami Marlins": "MIA", "Milwaukee Brewers": "MIL", "Minnesota Twins": "MIN", "New York Mets": "NYM", "New York Yankees": "NYY", "Oakland Athletics": "OAK", "Philadelphia Phillies": "PHI", "Pittsburgh Pirates": "PIT", "San Diego Padres": "SD", "San Francisco Giants": "SF", "Seattle Mariners": "SEA", "St. Louis Cardinals": "STL", "Tampa Bay Rays": "TB", "Texas Rangers": "TEX", "Toronto Blue Jays": "TOR", "Washington Nationals": "WSH", "Diamondbacks": "ARI", "Braves": "ATL", "Orioles": "BAL", "Red Sox": "BOS", "Cubs": "CHC", "White Sox": "CHW", "Reds": "CIN", "Guardians": "CLE", "Indians": "CLE", "Rockies": "COL", "Angels": "LAA", "Dodgers": "LAD", "Marlins": "MIA", "Brewers": "MIL", "Twins": "MIN", "Mets": "NYM", "Yankees": "NYY", "Athletics": "OAK", "Phillies": "PHI", "Pirates": "PIT", "Padres": "SD", "Giants": "SF", "Mariners": "SEA", "Cardinals": "STL", "Rays": "TB", "Rangers": "TEX", "Blue Jays": "TOR", "Nationals": "WSH", "ARZ": "ARI", "CWS": "CHW", "METS": "NYM", "YANKEES": "NYY", "ATH": "OAK" }
+# Calculate features when the app starts
+calculate_all_features()
 
 @app.route('/features')
 def get_features():
-    """Calculates and returns the features for a given game."""
+    """Returns the most recent pre-calculated features for a given team."""
     home_team_full = request.args.get('home_team')
     away_team_full = request.args.get('away_team')
 
     if not all([home_team_full, away_team_full]):
         return jsonify({'error': 'Missing home_team or away_team parameter'}), 400
 
-    # Standardize names
     home_team = TEAM_NAME_MAP.get(home_team_full, home_team_full)
     away_team = TEAM_NAME_MAP.get(away_team_full, away_team_full)
 
-    # This is a simplified feature calculation for a live game.
-    # A production system would have a more robust way of getting the latest stats.
-    try:
-        # Simulate getting the most recent rolling stats for each team
-        home_hitting_stats = batter_stats_df[batter_stats_df['team'] == home_team].tail(10).agg(total_hits=('hits', 'mean'), total_homers=('home_runs', 'mean'))
-        away_hitting_stats = batter_stats_df[batter_stats_df['team'] == away_team].tail(10).agg(total_hits=('hits', 'mean'), total_homers=('home_runs', 'mean'))
-        
-        # Simulate getting starter, bullpen, and park factor data
-        # In a real app, you would identify the actual starters for today's game.
-        home_starter_era = pitcher_stats_df[pitcher_stats_df['team'] == home_team]['earned_runs'].mean() * 9 / 5
-        home_starter_ks = pitcher_stats_df[pitcher_stats_df['team'] == home_team]['strikeouts'].mean()
-        away_starter_era = pitcher_stats_df[pitcher_stats_df['team'] == away_team]['earned_runs'].mean() * 9 / 5
-        away_starter_ks = pitcher_stats_df[pitcher_stats_df['team'] == away_team]['strikeouts'].mean()
-        home_bullpen_era = 4.0 
-        away_bullpen_era = 4.0
-        park_factor = games_df[games_df['home_team'] == home_team]['total_runs'].mean() if 'total_runs' in games_df else 9.0
+    home_feats = team_features[team_features['team'] == home_team].to_dict('records')[0]
+    away_feats = team_features[team_features['team'] == away_team].to_dict('records')[0]
 
-        features = {
-            'home_rolling_avg_hits': home_hitting_stats['total_hits'],
-            'home_rolling_avg_homers': home_hitting_stats['total_homers'],
-            'away_rolling_avg_hits': away_hitting_stats['total_hits'],
-            'away_rolling_avg_homers': away_hitting_stats['total_homers'],
-            'home_starter_rolling_era': home_starter_era,
-            'home_starter_rolling_ks': home_starter_ks,
-            'away_starter_rolling_era': away_starter_era,
-            'away_starter_rolling_ks': away_starter_ks,
-            'home_bullpen_rolling_era': home_bullpen_era,
-            'away_bullpen_rolling_era': away_bullpen_era,
-            'park_factor_avg_runs': park_factor
-        }
-        return jsonify(features)
-    except Exception as e:
-        return jsonify({'error': f'Could not calculate features: {str(e)}'}), 500
-
+    features = {
+        'home_rolling_avg_hits': home_feats.get('rolling_avg_hits', 8.0),
+        'home_rolling_avg_homers': home_feats.get('rolling_avg_homers', 1.0),
+        'away_rolling_avg_hits': away_feats.get('rolling_avg_hits', 8.0),
+        'away_rolling_avg_homers': away_feats.get('rolling_avg_homers', 1.0),
+        'home_starter_rolling_era': home_feats.get('starter_rolling_era', 4.0),
+        'home_starter_rolling_ks': home_feats.get('starter_rolling_ks', 5.0),
+        'away_starter_rolling_era': away_feats.get('starter_rolling_era', 4.0),
+        'away_starter_rolling_ks': away_feats.get('starter_rolling_ks', 5.0),
+        'home_bullpen_rolling_era': home_feats.get('bullpen_rolling_era', 4.0),
+        'away_bullpen_rolling_era': away_feats.get('bullpen_rolling_era', 4.0),
+        'park_factor_avg_runs': home_feats.get('park_factor_avg_runs', 9.0)
+    }
+    return jsonify(features)
 
 @app.route('/predict', methods=['POST'])
 def predict():
