@@ -55,7 +55,14 @@ def get_features_endpoint():
     away_feats = features_df[features_df['team'] == away_team_abbr].to_dict('records')
 
     if not home_feats or not away_feats:
-        return jsonify({'error': 'Could not find pre-computed features for one or both teams.'}), 404
+        # Return safe defaults if a team isn't in our historical data
+        default_feats = {
+            'rolling_avg_hits': 8.5, 'rolling_avg_homers': 1.2,
+            'starter_rolling_era': 4.2, 'starter_rolling_ks': 5.5,
+            'bullpen_rolling_era': 4.0, 'park_factor_avg_runs': 9.0
+        }
+        home_feats = [default_feats] if not home_feats else home_feats
+        away_feats = [default_feats] if not away_feats else away_feats
 
     home_feats = home_feats[0]
     away_feats = away_feats[0]
