@@ -63,8 +63,8 @@ def get_team_features(team_abbr):
             bullpen_era = 4.0
 
             return {
-                "rolling_avg_hits": hitting_res[0] if hitting_res else 8.0,
-                "rolling_avg_homers": hitting_res[1] if hitting_res else 1.0,
+                "rolling_avg_hits": hitting_res[0] if hitting_res and hitting_res[0] is not None else 8.0,
+                "rolling_avg_homers": hitting_res[1] if hitting_res and hitting_res[1] is not None else 1.0,
                 "starter_rolling_era": starter_era,
                 "starter_rolling_ks": starter_ks,
                 "bullpen_rolling_era": bullpen_era,
