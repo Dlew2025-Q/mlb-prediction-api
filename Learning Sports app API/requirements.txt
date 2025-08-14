@@ -6,3 +6,4 @@ xgboost
 Flask-Cors
 psycopg2-binary
 sqlalchemy
+numpy
