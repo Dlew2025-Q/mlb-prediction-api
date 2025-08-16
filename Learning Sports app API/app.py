@@ -78,9 +78,9 @@ def get_features_endpoint():
         'starter_rolling_ks_away_starter': away_feats.get('starter_rolling_ks', 5.5),
         'bullpen_rolling_era_away_bullpen': away_feats.get('bullpen_rolling_era', 4.2),
         'rolling_avg_hot_hitters_away_hotness': away_feats.get('rolling_avg_hot_hitters', 10.0),
-        'temperature': 70,
-        'wind_speed': 5,
-        'humidity': 50,
+        'temperature': 70, # Placeholder for weather
+        'wind_speed': 5,   # Placeholder for weather
+        'humidity': 50,    # Placeholder for weather
         'park_factor_avg_runs': home_feats.get('park_factor_avg_runs', 9.0)
     }
     
@@ -93,6 +93,7 @@ def predict():
     try:
         data = request.get_json()
         features_df = pd.DataFrame([data])
+        # Use the model's expected feature names to ensure order
         required_features = model.get_booster().feature_names
         prediction = model.predict(features_df[required_features])
         predicted_runs = float(prediction[0])
