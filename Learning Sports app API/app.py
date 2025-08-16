@@ -51,21 +51,20 @@ def get_features_endpoint():
     home_team_abbr = TEAM_NAME_MAP.get(home_team_full, home_team_full)
     away_team_abbr = TEAM_NAME_MAP.get(away_team_full, away_team_full)
 
-    home_feats = features_df[features_df['team'] == home_team_abbr].to_dict('records')
-    away_feats = features_df[features_df['team'] == away_team_abbr].to_dict('records')
+    home_feats_list = features_df[features_df['team'] == home_team_abbr].to_dict('records')
+    away_feats_list = features_df[features_df['team'] == away_team_abbr].to_dict('records')
 
-    if not home_feats or not away_feats:
-        default_feats = {
-            'rolling_avg_hits': 8.5, 'rolling_avg_homers': 1.2,
-            'starter_rolling_era': 4.2, 'starter_rolling_ks': 5.5,
-            'bullpen_rolling_era': 4.0, 'park_factor_avg_runs': 9.0,
-            'rolling_avg_hot_hitters': 10.0
-        }
-        home_feats = [default_feats] if not home_feats else home_feats
-        away_feats = [default_feats] if not away_feats else away_feats
-
-    home_feats = home_feats[0]
-    away_feats = away_feats[0]
+    # --- ROBUSTNESS FIX ---
+    # If a team is not found, use safe, league-average defaults instead of crashing.
+    default_feats = {
+        'rolling_avg_hits': 8.5, 'rolling_avg_homers': 1.2,
+        'starter_rolling_era': 4.2, 'starter_rolling_ks': 5.5,
+        'bullpen_rolling_era': 4.0, 'park_factor_avg_runs': 9.0,
+        'rolling_avg_hot_hitters': 10.0
+    }
+    
+    home_feats = home_feats_list[0] if home_feats_list else default_feats
+    away_feats = away_feats_list[0] if away_feats_list else default_feats
 
     final_features = {
         'rolling_avg_hits_home': home_feats.get('rolling_avg_hits', 8.0),
@@ -95,6 +94,7 @@ def predict():
     try:
         data = request.get_json()
         features_df = pd.DataFrame([data])
+        # Use the model's expected feature names to ensure order
         required_features = model.get_booster().feature_names
         prediction = model.predict(features_df[required_features])
         predicted_runs = float(prediction[0])
