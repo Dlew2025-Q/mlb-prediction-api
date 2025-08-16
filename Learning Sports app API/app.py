@@ -5,7 +5,7 @@ import pandas as pd
 import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from datetime import date
+from datetime import datetime, timezone
 
 app = Flask(__name__)
 CORS(app) # Enable Cross-Origin Resource Sharing
@@ -80,10 +80,17 @@ def get_games():
         response = requests.get(url)
         response.raise_for_status()
         games = response.json()
-        # Filter for today's games on the server-side.
-        today_str = date.today().isoformat()
-        today_games = [g for g in games if g['commence_time'].startswith(today_str)]
-        return jsonify(today_games)
+
+        # --- CHANGE: Filter out games that have already started ---
+        now_utc = datetime.now(timezone.utc)
+        # The API returns times in ISO 8601 format (e.g., "2023-08-17T02:10:00Z")
+        # We parse this and compare it to the current time to find upcoming games.
+        upcoming_games = [
+            g for g in games 
+            if datetime.fromisoformat(g['commence_time'].replace('Z', '+00:00')) > now_utc
+        ]
+        return jsonify(upcoming_games)
+
     except requests.exceptions.RequestException as e:
         return jsonify({'error': f'Failed to fetch data from The Odds API: {e}'}), 502 # Bad Gateway
 
