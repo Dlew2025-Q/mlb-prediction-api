@@ -55,11 +55,11 @@ def get_features_endpoint():
     away_feats = features_df[features_df['team'] == away_team_abbr].to_dict('records')
 
     if not home_feats or not away_feats:
-        # Return safe defaults if a team isn't in our historical data
         default_feats = {
             'rolling_avg_hits': 8.5, 'rolling_avg_homers': 1.2,
             'starter_rolling_era': 4.2, 'starter_rolling_ks': 5.5,
-            'bullpen_rolling_era': 4.0, 'park_factor_avg_runs': 9.0
+            'bullpen_rolling_era': 4.0, 'park_factor_avg_runs': 9.0,
+            'rolling_avg_hot_hitters': 10.0
         }
         home_feats = [default_feats] if not home_feats else home_feats
         away_feats = [default_feats] if not away_feats else away_feats
@@ -68,16 +68,21 @@ def get_features_endpoint():
     away_feats = away_feats[0]
 
     final_features = {
-        'home_rolling_avg_hits': home_feats.get('rolling_avg_hits', 8.0),
-        'home_rolling_avg_homers': home_feats.get('rolling_avg_homers', 1.0),
-        'home_starter_rolling_era': home_feats.get('starter_rolling_era', 4.5),
-        'home_starter_rolling_ks': home_feats.get('starter_rolling_ks', 5.5),
-        'home_bullpen_rolling_era': home_feats.get('bullpen_rolling_era', 4.2),
-        'away_rolling_avg_hits': away_feats.get('rolling_avg_hits', 8.0),
-        'away_rolling_avg_homers': away_feats.get('rolling_avg_homers', 1.0),
-        'away_starter_rolling_era': away_feats.get('starter_rolling_era', 4.5),
-        'away_starter_rolling_ks': away_feats.get('starter_rolling_ks', 5.5),
-        'away_bullpen_rolling_era': away_feats.get('bullpen_rolling_era', 4.2),
+        'rolling_avg_hits_home': home_feats.get('rolling_avg_hits', 8.0),
+        'rolling_avg_homers_home': home_feats.get('rolling_avg_homers', 1.0),
+        'starter_rolling_era_home_starter': home_feats.get('starter_rolling_era', 4.5),
+        'starter_rolling_ks_home_starter': home_feats.get('starter_rolling_ks', 5.5),
+        'bullpen_rolling_era_home_bullpen': home_feats.get('bullpen_rolling_era', 4.2),
+        'rolling_avg_hot_hitters_home_hotness': home_feats.get('rolling_avg_hot_hitters', 10.0),
+        'rolling_avg_hits_away': away_feats.get('rolling_avg_hits', 8.0),
+        'rolling_avg_homers_away': away_feats.get('rolling_avg_homers', 1.0),
+        'starter_rolling_era_away_starter': away_feats.get('starter_rolling_era', 4.5),
+        'starter_rolling_ks_away_starter': away_feats.get('starter_rolling_ks', 5.5),
+        'bullpen_rolling_era_away_bullpen': away_feats.get('bullpen_rolling_era', 4.2),
+        'rolling_avg_hot_hitters_away_hotness': away_feats.get('rolling_avg_hot_hitters', 10.0),
+        'temperature': 70,
+        'wind_speed': 5,
+        'humidity': 50,
         'park_factor_avg_runs': home_feats.get('park_factor_avg_runs', 9.0)
     }
     
@@ -90,7 +95,6 @@ def predict():
     try:
         data = request.get_json()
         features_df = pd.DataFrame([data])
-        # Use the model's expected feature names to ensure order
         required_features = model.get_booster().feature_names
         prediction = model.predict(features_df[required_features])
         predicted_runs = float(prediction[0])
