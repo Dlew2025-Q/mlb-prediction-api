@@ -35,8 +35,10 @@ TEAM_NAME_MAP = { "ARI": "ARI", "ATL": "ATL", "BAL": "BAL", "BOS": "BOS", "CHC":
 
 def get_team_features(team_abbr):
     """Calculates the latest features for a single team using direct, efficient SQL queries."""
-    if engine is None: return {}
-    
+    if engine is None:
+        return {}
+
+    # Define safe default values in case queries fail or return no data
     default_features = {
         "rolling_avg_hits": 8.0, "rolling_avg_homers": 1.0,
         "starter_rolling_era": 4.5, "starter_rolling_ks": 5.0,
@@ -45,6 +47,7 @@ def get_team_features(team_abbr):
 
     try:
         with engine.connect() as conn:
+            # Hitting stats: Average of the team's last 10 games
             hitting_query = text("""
                 SELECT AVG(total_hits), AVG(total_homers) FROM (
                     SELECT SUM(b.hits) as total_hits, SUM(b.home_runs) as total_homers
@@ -56,6 +59,7 @@ def get_team_features(team_abbr):
             """)
             hitting_res = conn.execute(hitting_query, {"team_name": team_abbr}).fetchone()
 
+            # For starter, bullpen, and park factor, we use simplified queries for this example.
             park_factor_query = text("SELECT AVG(home_score + away_score) FROM games WHERE home_team = :team_name;")
             park_factor_res = conn.execute(park_factor_query, {"team_name": team_abbr}).fetchone()
 
@@ -70,7 +74,7 @@ def get_team_features(team_abbr):
             
     except Exception as e:
         print(f"Error calculating features for {team_abbr}: {e}")
-        return default_features
+        return default_features # Return safe defaults on any error
 
 @app.route('/features')
 def get_features_endpoint():
@@ -87,7 +91,7 @@ def get_features_endpoint():
     home_feats = get_team_features(home_team_abbr)
     away_feats = get_team_features(away_team_abbr)
 
-    # --- FIX: Standardize the feature names to match the model's training ---
+    # Combine features for the model, ensuring all keys exist
     final_features = {
         'rolling_avg_hits_home': home_feats['rolling_avg_hits'],
         'rolling_avg_homers_home': home_feats['rolling_avg_homers'],
