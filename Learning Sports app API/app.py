@@ -93,11 +93,21 @@ def predict():
     try:
         data = request.get_json()
         features_df = pd.DataFrame([data])
-        required_features = model.get_booster().feature_names
-        prediction = model.predict(features_df[required_features])
+        
+        # --- DEBUGGING STEP ---
+        # Let's see exactly what the model expects and what it's getting.
+        expected_features = model.get_booster().feature_names
+        print("Model expects features:", expected_features)
+        print("Received features:", list(features_df.columns))
+        
+        # Reorder columns to match the model's expectation
+        features_df = features_df[expected_features]
+        
+        prediction = model.predict(features_df)
         predicted_runs = float(prediction[0])
         return jsonify({'predicted_total_runs': predicted_runs})
     except Exception as e:
+        print(f"An error occurred during prediction: {str(e)}")
         return jsonify({'error': f'An error occurred: {str(e)}'}), 400
 
 if __name__ == '__main__':
