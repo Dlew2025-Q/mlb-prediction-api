@@ -125,19 +125,23 @@ def predict():
         final_features_dict = {
             'rolling_avg_hits_home': home_feats.get('rolling_avg_hits'),
             'rolling_avg_homers_home': home_feats.get('rolling_avg_homers'),
-            'starter_rolling_era_home': home_feats.get('starter_rolling_era'),
-            'starter_rolling_ks_home': home_feats.get('starter_rolling_ks'),
-            'bullpen_rolling_era_home': home_feats.get('bullpen_rolling_era'),
+            'starter_rolling_era_home_starter': home_feats.get('starter_rolling_era'),
+            'starter_rolling_ks_home_starter': home_feats.get('starter_rolling_ks'),
+            'bullpen_rolling_era_home_bullpen': home_feats.get('bullpen_rolling_era'),
+            'rolling_avg_hot_hitters_home_hotness': home_feats.get('rolling_avg_hot_hitters', 0), # Placeholder
             'rolling_avg_hits_away': away_feats.get('rolling_avg_hits'),
             'rolling_avg_homers_away': away_feats.get('rolling_avg_homers'),
-            'starter_rolling_era_away': away_feats.get('starter_rolling_era'),
-            'starter_rolling_ks_away': away_feats.get('starter_rolling_ks'),
-            'bullpen_rolling_era_away': away_feats.get('bullpen_rolling_era'),
+            'starter_rolling_era_away_starter': away_feats.get('starter_rolling_era'),
+            'starter_rolling_ks_away_starter': away_feats.get('starter_rolling_ks'),
+            'bullpen_rolling_era_away_bullpen': away_feats.get('bullpen_rolling_era'),
+            'rolling_avg_hot_hitters_away_hotness': away_feats.get('rolling_avg_hot_hitters', 0), # Placeholder
             'park_factor_avg_runs': home_feats.get('park_factor_avg_runs'),
-            # Adding placeholders for weather if the model needs them.
+            # Adding placeholders for weather and betting lines if the model needs them.
             'temperature': 70, 
             'wind_speed': 5,
             'humidity': 50,
+            'opening_line': 8.5, # Placeholder
+            'line_movement': 0 # Placeholder
         }
 
         # Create a DataFrame from the dictionary for prediction.
