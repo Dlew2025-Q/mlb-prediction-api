@@ -23,20 +23,23 @@ if DB_URL:
 # --- LOAD THE TRAINED MODEL ---
 model_path = 'mlb_total_runs_model.pkl'
 model = None
-if os.path.exists(model_path):
+try:
     with open(model_path, 'rb') as file:
         model = pickle.load(file)
     print("Model loaded successfully.")
-else:
+except FileNotFoundError:
     print(f"Error: Model file not found at '{model_path}'.")
+except Exception as e:
+    print(f"An error occurred loading the model: {e}")
 
 # --- TEAM NAME MAP ---
 TEAM_NAME_MAP = { "ARI": "ARI", "ATL": "ATL", "BAL": "BAL", "BOS": "BOS", "CHC": "CHC", "CHW": "CHW", "CIN": "CIN", "CLE": "CLE", "COL": "COL", "DET": "DET", "HOU": "HOU", "KCR": "KC", "KC": "KC", "LAA": "LAA", "LAD": "LAD", "MIA": "MIA", "MIL": "MIL", "MIN": "MIN", "NYM": "NYM", "NYY": "NYY", "OAK": "OAK", "PHI": "PHI", "PIT": "PIT", "SDP": "SD", "SD": "SD", "SFG": "SF", "SF": "SF", "SEA": "SEA", "STL": "STL", "TBR": "TB", "TB": "TB", "TEX": "TEX", "TOR": "TOR", "WSN": "WSH", "WAS": "WSH", "Arizona Diamondbacks": "ARI", "Atlanta Braves": "ATL", "Baltimore Orioles": "BAL", "Boston Red Sox": "BOS", "Chicago Cubs": "CHC", "Chicago White Sox": "CHW", "Cincinnati Reds": "CIN", "Cleveland Guardians": "CLE", "Colorado Rockies": "COL", "Detroit Tigers": "DET", "Houston Astros": "HOU", "Kansas City Royals": "KC", "Los Angeles Angels": "LAA", "Los Angeles Dodgers": "LAD", "Miami Marlins": "MIA", "Milwaukee Brewers": "MIL", "Minnesota Twins": "MIN", "New York Mets": "NYM", "New York Yankees": "NYY", "Oakland Athletics": "OAK", "Philadelphia Phillies": "PHI", "Pittsburgh Pirates": "PIT", "San Diego Padres": "SD", "San Francisco Giants": "SF", "Seattle Mariners": "SEA", "St. Louis Cardinals": "STL", "Tampa Bay Rays": "TB", "Texas Rangers": "TEX", "Toronto Blue Jays": "TOR", "Washington Nationals": "WSH", "Diamondbacks": "ARI", "Braves": "ATL", "Orioles": "BAL", "Red Sox": "BOS", "Cubs": "CHC", "White Sox": "CHW", "Reds": "CIN", "Guardians": "CLE", "Indians": "CLE", "Rockies": "COL", "Angels": "LAA", "Dodgers": "LAD", "Marlins": "MIA", "Brewers": "MIL", "Twins": "MIN", "Mets": "NYM", "Yankees": "NYY", "Athletics": "OAK", "Phillies": "PHI", "Pirates": "PIT", "Padres": "SD", "Giants": "SF", "Mariners": "SEA", "Cardinals": "STL", "Rays": "TB", "Rangers": "TEX", "Blue Jays": "TOR", "Nationals": "WSH", "ARZ": "ARI", "CWS": "CHW", "METS": "NYM", "YANKEES": "NYY", "ATH": "OAK" }
 
 def get_team_features(team_abbr):
     """Calculates the latest features for a single team using direct, efficient SQL queries."""
-    if engine is None: return {}
-    
+    if engine is None:
+        return {}
+
     default_features = {
         "rolling_avg_hits": 8.0, "rolling_avg_homers": 1.0,
         "starter_rolling_era": 4.5, "starter_rolling_ks": 5.0,
@@ -87,23 +90,17 @@ def get_features_endpoint():
     home_feats = get_team_features(home_team_abbr)
     away_feats = get_team_features(away_team_abbr)
 
-    # --- FIX: Standardize the feature names to match the model's training ---
     final_features = {
-        'rolling_avg_hits_home': home_feats['rolling_avg_hits'],
-        'rolling_avg_homers_home': home_feats['rolling_avg_homers'],
-        'starter_rolling_era_home_starter': home_feats['starter_rolling_era'],
-        'starter_rolling_ks_home_starter': home_feats['starter_rolling_ks'],
-        'bullpen_rolling_era_home_bullpen': home_feats['bullpen_rolling_era'],
-        'rolling_avg_hits_away': away_feats['rolling_avg_hits'],
-        'rolling_avg_homers_away': away_feats['rolling_avg_homers'],
-        'starter_rolling_era_away_starter': away_feats['starter_rolling_era'],
-        'starter_rolling_ks_away_starter': away_feats['starter_rolling_ks'],
-        'bullpen_rolling_era_away_bullpen': away_feats['bullpen_rolling_era'],
-        'rolling_avg_hot_hitters_home_hotness': 10.0, # Placeholder
-        'rolling_avg_hot_hitters_away_hotness': 10.0, # Placeholder
-        'temperature': 70, # Placeholder
-        'wind_speed': 5,   # Placeholder
-        'humidity': 50,    # Placeholder
+        'home_rolling_avg_hits': home_feats['rolling_avg_hits'],
+        'home_rolling_avg_homers': home_feats['rolling_avg_homers'],
+        'home_starter_rolling_era': home_feats['starter_rolling_era'],
+        'home_starter_rolling_ks': home_feats['starter_rolling_ks'],
+        'home_bullpen_rolling_era': home_feats['bullpen_rolling_era'],
+        'away_rolling_avg_hits': away_feats['rolling_avg_hits'],
+        'away_rolling_avg_homers': away_feats['rolling_avg_homers'],
+        'away_starter_rolling_era': away_feats['starter_rolling_era'],
+        'away_starter_rolling_ks': away_feats['starter_rolling_ks'],
+        'away_bullpen_rolling_era': away_feats['bullpen_rolling_era'],
         'park_factor_avg_runs': home_feats['park_factor_avg_runs']
     }
     
@@ -116,8 +113,14 @@ def predict():
     try:
         data = request.get_json()
         features_df = pd.DataFrame([data])
-        # Use the exact feature names the model was trained on
-        required_features = model.get_booster().feature_names
+        required_features = [
+            'home_rolling_avg_hits', 'home_rolling_avg_homers',
+            'away_rolling_avg_hits', 'away_rolling_avg_homers',
+            'home_starter_rolling_era', 'home_starter_rolling_ks',
+            'away_starter_rolling_era', 'away_starter_rolling_ks',
+            'home_bullpen_rolling_era', 'away_bullpen_rolling_era',
+            'park_factor_avg_runs'
+        ]
         features_df = features_df[required_features]
         prediction = model.predict(features_df)
         predicted_runs = float(prediction[0])
