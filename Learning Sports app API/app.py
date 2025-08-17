@@ -11,31 +11,27 @@ app = Flask(__name__)
 CORS(app) # Enable Cross-Origin Resource Sharing
 
 # --- LOAD MODEL AND FEATURES ON STARTUP ---
-# Load the pre-trained XGBoost model.
 try:
     with open('mlb_total_runs_model.pkl', 'rb') as file:
         model = pickle.load(file)
-    # Store the expected feature names from the model. This is crucial for validation.
     MODEL_FEATURES = model.get_booster().feature_names
     print("Model loaded successfully.")
     print(f"Model expects {len(MODEL_FEATURES)} features.")
 except Exception as e:
     model = None
     MODEL_FEATURES = []
-    print(f"CRITICAL ERROR: Could not load model. API will not be able to make predictions. Error: {e}")
+    print(f"CRITICAL ERROR: Could not load model. Error: {e}")
 
-# Load the pre-computed features DataFrame.
 try:
     with open('latest_features.pkl', 'rb') as file:
         features_df = pickle.load(file)
     print("Pre-computed features loaded successfully.")
 except Exception as e:
     features_df = None
-    print(f"CRITICAL ERROR: Could not load pre-computed features. API will not work. Error: {e}")
+    print(f"CRITICAL ERROR: Could not load pre-computed features. Error: {e}")
 
 # --- CONFIGURATION & UTILITIES ---
 ODDS_API_KEY = os.environ.get('ODDS_API_KEY')
-# This mapping must be identical to the one in precompute_features.py
 TEAM_NAME_MAP = {
     "ARI": "ARI", "ATL": "ATL", "BAL": "BAL", "BOS": "BOS", "CHC": "CHC", 
     "CHW": "CHW", "CIN": "CIN", "CLE": "CLE", "COL": "COL", "DET": "DET", 
@@ -65,13 +61,8 @@ TEAM_NAME_MAP = {
 }
 
 # --- API ENDPOINTS ---
-
 @app.route('/games')
 def get_games():
-    """
-    Proxy endpoint to securely fetch game odds from The Odds API.
-    The frontend calls this instead of calling the API directly.
-    """
     if not ODDS_API_KEY:
         return jsonify({'error': 'API key is not configured on the server.'}), 500
     
@@ -80,27 +71,19 @@ def get_games():
         response = requests.get(url)
         response.raise_for_status()
         games = response.json()
-
-        # --- CHANGE: Filter out games that have already started ---
         now_utc = datetime.now(timezone.utc)
-        # The API returns times in ISO 8601 format (e.g., "2023-08-17T02:10:00Z")
-        # We parse this and compare it to the current time to find upcoming games.
         upcoming_games = [
             g for g in games 
             if datetime.fromisoformat(g['commence_time'].replace('Z', '+00:00')) > now_utc
         ]
         return jsonify(upcoming_games)
-
     except requests.exceptions.RequestException as e:
-        return jsonify({'error': f'Failed to fetch data from The Odds API: {e}'}), 502 # Bad Gateway
+        return jsonify({'error': f'Failed to fetch data from The Odds API: {e}'}), 502
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    """
-    Receives game data, combines it with pre-computed features, and returns a model prediction.
-    """
     if model is None or features_df is None:
-        return jsonify({'error': 'Server is not ready; model or features not loaded.'}), 503 # Service Unavailable
+        return jsonify({'error': 'Server is not ready; model or features not loaded.'}), 503
 
     try:
         data = request.get_json()
@@ -110,15 +93,12 @@ def predict():
         if not all([home_team_full, away_team_full]):
             return jsonify({'error': 'Missing home_team or away_team in request body'}), 400
 
-        # Standardize team names to match our feature data.
         home_abbr = TEAM_NAME_MAP.get(home_team_full, home_team_full)
         away_abbr = TEAM_NAME_MAP.get(away_team_full, away_team_full)
 
-        # Get features for each team.
         home_feats_row = features_df[features_df['team'] == home_abbr]
         away_feats_row = features_df[features_df['team'] == away_abbr]
 
-        # If a team's features aren't found, we can't make a prediction.
         if home_feats_row.empty or away_feats_row.empty:
             missing_team = home_abbr if home_feats_row.empty else away_abbr
             return jsonify({'error': f'No pre-computed features found for team: {missing_team}'}), 404
@@ -126,33 +106,20 @@ def predict():
         home_feats = home_feats_row.iloc[0].to_dict()
         away_feats = away_feats_row.iloc[0].to_dict()
         
-        # --- IMPORTANT: Feature Vector Construction ---
-        # This dictionary structure MUST EXACTLY MATCH the features the model was trained on.
-        # Any mismatch in keys here will cause a prediction error.
+        # --- CHANGE: Construct feature vector with NEW opponent-adjusted feature names ---
         final_features_dict = {
-            'rolling_avg_hits_home': home_feats.get('rolling_avg_hits'),
-            'rolling_avg_homers_home': home_feats.get('rolling_avg_homers'),
-            'starter_rolling_era_home_starter': home_feats.get('starter_rolling_era'),
-            'starter_rolling_ks_home_starter': home_feats.get('starter_rolling_ks'),
-            'bullpen_rolling_era_home_bullpen': home_feats.get('bullpen_rolling_era'),
-            'rolling_avg_hot_hitters_home_hotness': home_feats.get('rolling_avg_hot_hitters', 0), # Placeholder
-            'rolling_avg_hits_away': away_feats.get('rolling_avg_hits'),
-            'rolling_avg_homers_away': away_feats.get('rolling_avg_homers'),
-            'starter_rolling_era_away_starter': away_feats.get('starter_rolling_era'),
-            'starter_rolling_ks_away_starter': away_feats.get('starter_rolling_ks'),
-            'bullpen_rolling_era_away_bullpen': away_feats.get('bullpen_rolling_era'),
-            'rolling_avg_hot_hitters_away_hotness': away_feats.get('rolling_avg_hot_hitters', 0), # Placeholder
-            'park_factor_avg_runs': home_feats.get('park_factor_avg_runs'),
-            # Adding placeholders for weather and betting lines if the model needs them.
-            'temperature': 70, 
-            'wind_speed': 5,
-            'humidity': 50,
-            'opening_line': 8.5, # Placeholder
-            'line_movement': 0 # Placeholder
+            'rolling_avg_adj_hits_home': home_feats.get('rolling_avg_adj_hits'),
+            'rolling_avg_adj_homers_home': home_feats.get('rolling_avg_adj_homers'),
+            'starter_rolling_adj_era_home': home_feats.get('starter_rolling_adj_era'),
+            'rolling_avg_adj_hits_away': away_feats.get('rolling_avg_adj_hits'),
+            'rolling_avg_adj_homers_away': away_feats.get('rolling_avg_adj_homers'),
+            'starter_rolling_adj_era_away': away_feats.get('starter_rolling_adj_era'),
+            # Add any other new/old features your retrained model expects.
+            # For example, if you kept park factors:
+            # 'park_factor_avg_runs': home_feats.get('park_factor_avg_runs'),
         }
 
-        # Create a DataFrame from the dictionary for prediction.
-        # Ensure the column order matches what the model expects.
+        # Create a DataFrame and ensure column order matches the model's expectations
         prediction_df = pd.DataFrame([final_features_dict])[MODEL_FEATURES]
         
         prediction = model.predict(prediction_df)
@@ -160,14 +127,12 @@ def predict():
         return jsonify({'predicted_total_runs': float(prediction[0])})
 
     except KeyError as e:
-        # This is the most common error: a feature is missing or misnamed.
         return jsonify({
-            'error': f'Feature mismatch error. The model expected a feature that was not provided: {e}',
+            'error': f'Feature mismatch error. Model expected a feature that was not provided: {e}',
             'provided_features': list(final_features_dict.keys()),
             'expected_features': MODEL_FEATURES
         }), 400
     except Exception as e:
-        # Catch any other unexpected errors.
         return jsonify({'error': f'An unexpected error occurred during prediction: {str(e)}'}), 500
 
 if __name__ == '__main__':
