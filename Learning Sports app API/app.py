@@ -77,9 +77,10 @@ CITY_MAP = {
 def get_probable_pitchers(game_data):
     home_pitcher, away_pitcher = None, None
     try:
+        # This logic is a best-effort attempt; The Odds API doesn't guarantee pitcher data
         for bookmaker in game_data.get('bookmakers', []):
             for market in bookmaker.get('markets', []):
-                if market.get('key') == 'pitcher_strikeouts':
+                if 'pitcher' in market.get('key', ''):
                     for outcome in market.get('outcomes', []):
                         pitcher_name = outcome.get('description')
                         if pitcher_name:
@@ -95,7 +96,7 @@ def get_probable_pitchers(game_data):
 
 def get_weather_for_game(city):
     if not WEATHER_API_KEY or not city:
-        return {'temperature': 70, 'wind_speed': 5, 'humidity': 50}
+        return {'temperature': 70.0, 'wind_speed': 5.0, 'humidity': 50.0}
     url = f"https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/{city}/today?unitGroup=us&include=current&key={WEATHER_API_KEY}&contentType=json"
     try:
         response = requests.get(url)
@@ -103,22 +104,19 @@ def get_weather_for_game(city):
         weather_data = response.json()
         current_conditions = weather_data.get('currentConditions', {})
         return {
-            'temperature': current_conditions.get('temp', 70),
-            'wind_speed': current_conditions.get('windspeed', 5),
-            'humidity': current_conditions.get('humidity', 50)
+            'temperature': float(current_conditions.get('temp', 70.0)),
+            'wind_speed': float(current_conditions.get('windspeed', 5.0)),
+            'humidity': float(current_conditions.get('humidity', 50.0))
         }
     except requests.exceptions.RequestException as e:
         print(f"Warning: Could not fetch weather data for {city}. Error: {e}")
-        return {'temperature': 70, 'wind_speed': 5, 'humidity': 50}
+        return {'temperature': 70.0, 'wind_speed': 5.0, 'humidity': 50.0}
 
 @app.route('/games')
 def get_games():
     if not ODDS_API_KEY:
         return jsonify({'error': 'API key is not configured on the server.'}), 500
-    
-    # --- FIX: Changed the 'markets' parameter to only request 'totals' ---
     url = f"https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?apiKey={ODDS_API_KEY}&regions=us&markets=totals"
-    
     try:
         response = requests.get(url)
         response.raise_for_status()
@@ -127,7 +125,6 @@ def get_games():
         upcoming_games = [g for g in games if datetime.fromisoformat(g['commence_time'].replace('Z', '+00:00')) > now_utc]
         return jsonify(upcoming_games)
     except requests.exceptions.RequestException as e:
-        # Pass the actual error from the API back to the front-end for better debugging
         return jsonify({'error': f'Failed to fetch data from The Odds API: {e}'}), 502
 
 @app.route('/predict', methods=['POST'])
@@ -164,19 +161,20 @@ def predict():
         home_pitcher_stats = pitcher_features_df[pitcher_features_df['player_name'] == home_pitcher_name] if home_pitcher_name else pd.DataFrame()
         away_pitcher_stats = pitcher_features_df[pitcher_features_df['player_name'] == away_pitcher_name] if away_pitcher_name else pd.DataFrame()
 
-        home_starter_era = home_pitcher_stats.iloc[0]['starter_rolling_adj_era'] if not home_pitcher_stats.empty else home_feats.get('starter_rolling_adj_era')
-        away_starter_era = away_pitcher_stats.iloc[0]['starter_rolling_adj_era'] if not away_pitcher_stats.empty else away_feats.get('starter_rolling_adj_era')
+        # --- FIX: Ensure all feature values are explicitly converted to float with sensible defaults ---
+        home_starter_era = float(home_pitcher_stats.iloc[0]['starter_rolling_adj_era']) if not home_pitcher_stats.empty else float(home_feats.get('starter_rolling_adj_era', 4.5))
+        away_starter_era = float(away_pitcher_stats.iloc[0]['starter_rolling_adj_era']) if not away_pitcher_stats.empty else float(away_feats.get('starter_rolling_adj_era', 4.5))
 
         final_features_dict = {
-            'rolling_avg_adj_hits_home': home_feats.get('rolling_avg_adj_hits'),
-            'rolling_avg_adj_homers_home': home_feats.get('rolling_avg_adj_homers'),
+            'rolling_avg_adj_hits_home': float(home_feats.get('rolling_avg_adj_hits', 8.0)),
+            'rolling_avg_adj_homers_home': float(home_feats.get('rolling_avg_adj_homers', 1.0)),
             'starter_rolling_adj_era_home': home_starter_era,
-            'rolling_avg_adj_hits_away': away_feats.get('rolling_avg_adj_hits'),
-            'rolling_avg_adj_homers_away': away_feats.get('rolling_avg_adj_homers'),
+            'rolling_avg_adj_hits_away': float(away_feats.get('rolling_avg_adj_hits', 8.0)),
+            'rolling_avg_adj_homers_away': float(away_feats.get('rolling_avg_adj_homers', 1.0)),
             'starter_rolling_adj_era_away': away_starter_era,
-            'park_factor': home_feats.get('park_factor'),
-            'bullpen_ip_last_3_days_home': home_feats.get('bullpen_ip_last_3_days'),
-            'bullpen_ip_last_3_days_away': away_feats.get('bullpen_ip_last_3_days'),
+            'park_factor': float(home_feats.get('park_factor', 9.0)),
+            'bullpen_ip_last_3_days_home': float(home_feats.get('bullpen_ip_last_3_days', 0.0)),
+            'bullpen_ip_last_3_days_away': float(away_feats.get('bullpen_ip_last_3_days', 0.0)),
             'temperature': weather['temperature'],
             'wind_speed': weather['wind_speed'],
             'humidity': weather['humidity'],
