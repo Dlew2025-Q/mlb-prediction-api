@@ -152,7 +152,8 @@ def predict():
             'bullpen_ip_last_3_days_home': home_feats.get('bullpen_ip_last_3_days'),
             'bullpen_ip_last_3_days_away': away_feats.get('bullpen_ip_last_3_days'),
             
-            # Use live weather data if the new model expects it
+            # NOTE: If your new model was trained on weather, uncomment these lines.
+            # If not, keep them commented out.
             # 'temperature': weather['temperature'],
             # 'wind_speed': weather['wind_speed'],
             # 'humidity': weather['humidity'],
