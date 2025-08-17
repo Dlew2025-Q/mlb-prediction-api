@@ -32,7 +32,6 @@ except Exception as e:
 
 # --- CONFIGURATION & UTILITIES ---
 ODDS_API_KEY = os.environ.get('ODDS_API_KEY')
-# NEW: Add your Weather API Key
 WEATHER_API_KEY = os.environ.get('WEATHER_API_KEY')
 
 TEAM_NAME_MAP = {
@@ -63,7 +62,6 @@ TEAM_NAME_MAP = {
     "ARZ": "ARI", "AZ": "ARI", "CWS": "CHW", "METS": "NYM", "YANKEES": "NYY", "ATH": "OAK"
 }
 
-# NEW: Map for team abbreviations to their home city for the weather API
 CITY_MAP = {
     "ARI": "Phoenix,AZ", "ATL": "Atlanta,GA", "BAL": "Baltimore,MD", "BOS": "Boston,MA", "CHC": "Chicago,IL",
     "CHW": "Chicago,IL", "CIN": "Cincinnati,OH", "CLE": "Cleveland,OH", "COL": "Denver,CO", "DET": "Detroit,MI",
@@ -74,11 +72,8 @@ CITY_MAP = {
     "TOR": "Toronto,ON", "WSH": "Washington,DC"
 }
 
-# --- NEW: Weather Fetching Function ---
 def get_weather_for_game(city):
-    """Fetches weather data for a given city using the Visual Crossing API."""
     if not WEATHER_API_KEY or not city:
-        # Return default values if key or city is missing
         return {'temperature': 70, 'wind_speed': 5, 'humidity': 50}
     
     url = f"https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/{city}/today?unitGroup=us&include=current&key={WEATHER_API_KEY}&contentType=json"
@@ -87,9 +82,7 @@ def get_weather_for_game(city):
         response = requests.get(url)
         response.raise_for_status()
         weather_data = response.json()
-        
         current_conditions = weather_data.get('currentConditions', {})
-        
         return {
             'temperature': current_conditions.get('temp', 70),
             'wind_speed': current_conditions.get('windspeed', 5),
@@ -97,7 +90,6 @@ def get_weather_for_game(city):
         }
     except requests.exceptions.RequestException as e:
         print(f"Warning: Could not fetch weather data for {city}. Error: {e}")
-        # Return default values on API failure
         return {'temperature': 70, 'wind_speed': 5, 'humidity': 50}
 
 # --- API ENDPOINTS ---
@@ -136,7 +128,6 @@ def predict():
         home_abbr = TEAM_NAME_MAP.get(home_team_full, home_team_full)
         away_abbr = TEAM_NAME_MAP.get(away_team_full, away_team_full)
 
-        # NEW: Fetch live weather for the home team's city
         home_city = CITY_MAP.get(home_abbr)
         weather = get_weather_for_game(home_city)
 
@@ -150,21 +141,32 @@ def predict():
         home_feats = home_feats_row.iloc[0].to_dict()
         away_feats = away_feats_row.iloc[0].to_dict()
         
+        # --- FIX: Reverted to match the OLD model's expectations, but with NEW data ---
+        # The KEYS are the OLD feature names the model was trained on.
+        # The VALUES come from the NEW opponent-adjusted columns and LIVE weather data.
         final_features_dict = {
-            'rolling_avg_adj_hits_home': home_feats.get('rolling_avg_adj_hits'),
-            'rolling_avg_adj_homers_home': home_feats.get('rolling_avg_adj_homers'),
-            'starter_rolling_adj_era_home': home_feats.get('starter_rolling_adj_era'),
-            'rolling_avg_adj_hits_away': away_feats.get('rolling_avg_adj_hits'),
-            'rolling_avg_adj_homers_away': away_feats.get('rolling_avg_adj_homers'),
-            'starter_rolling_adj_era_away': away_feats.get('starter_rolling_adj_era'),
+            'rolling_avg_hits_home': home_feats.get('rolling_avg_adj_hits'),
+            'rolling_avg_homers_home': home_feats.get('rolling_avg_adj_homers'),
+            'starter_rolling_era_home_starter': home_feats.get('starter_rolling_adj_era'),
+            'rolling_avg_hits_away': away_feats.get('rolling_avg_adj_hits'),
+            'rolling_avg_homers_away': away_feats.get('rolling_avg_adj_homers'),
+            'starter_rolling_era_away_starter': away_feats.get('starter_rolling_adj_era'),
             
-            # NEW: Use live weather data instead of placeholders
+            # Use live weather data
             'temperature': weather['temperature'],
             'wind_speed': weather['wind_speed'],
             'humidity': weather['humidity'],
             
-            # Add placeholders for any other features your model expects
-            'park_factor_avg_runs': 9.0, 
+            # Add placeholders for other features the old model expects
+            'starter_rolling_ks_home_starter': 5.0,
+            'starter_rolling_ks_away_starter': 5.0,
+            'bullpen_rolling_era_home_bullpen': 4.0,
+            'bullpen_rolling_era_away_bullpen': 4.0,
+            'rolling_avg_hot_hitters_home_hotness': 10.0,
+            'rolling_avg_hot_hitters_away_hotness': 10.0,
+            'park_factor_avg_runs': 9.0,
+            'opening_line': 8.5,
+            'line_movement': 0
         }
 
         # Create a DataFrame and ensure column order matches the model's expectations
