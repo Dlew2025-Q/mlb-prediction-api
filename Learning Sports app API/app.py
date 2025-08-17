@@ -16,7 +16,6 @@ try:
         model = pickle.load(file)
     MODEL_FEATURES = model.get_booster().feature_names
     print("Model loaded successfully.")
-    print(f"Model expects {len(MODEL_FEATURES)} features.")
 except Exception as e:
     model = None
     MODEL_FEATURES = []
@@ -24,10 +23,14 @@ except Exception as e:
 
 try:
     with open('latest_features.pkl', 'rb') as file:
-        features_df = pickle.load(file)
-    print("Pre-computed features loaded successfully.")
+        # --- CHANGE: Load the new dictionary structure ---
+        features_dict = pickle.load(file)
+        team_features_df = features_dict['team_features']
+        pitcher_features_df = features_dict['pitcher_features']
+    print("Pre-computed team and pitcher features loaded successfully.")
 except Exception as e:
-    features_df = None
+    team_features_df = None
+    pitcher_features_df = None
     print(f"CRITICAL ERROR: Could not load pre-computed features. Error: {e}")
 
 # --- CONFIGURATION & UTILITIES ---
@@ -72,12 +75,34 @@ CITY_MAP = {
     "TOR": "Toronto,ON", "WSH": "Washington,DC"
 }
 
+# --- NEW: Function to get probable pitchers from odds data ---
+def get_probable_pitchers(game_data):
+    """Parses game data from The Odds API to find probable pitcher names."""
+    home_pitcher, away_pitcher = None, None
+    try:
+        # Pitcher names are often in the 'description' of pitcher prop bets
+        for bookmaker in game_data.get('bookmakers', []):
+            for market in bookmaker.get('markets', []):
+                if market.get('key') == 'pitcher_strikeouts':
+                    for outcome in market.get('outcomes', []):
+                        pitcher_name = outcome.get('description')
+                        if pitcher_name:
+                            # Check if the pitcher belongs to the home or away team
+                            if game_data['home_team'] in outcome['name']:
+                                home_pitcher = pitcher_name
+                            elif game_data['away_team'] in outcome['name']:
+                                away_pitcher = pitcher_name
+                if home_pitcher and away_pitcher:
+                    return home_pitcher, away_pitcher
+    except Exception as e:
+        print(f"Warning: Could not parse pitcher data for game {game_data.get('id')}. Error: {e}")
+    return home_pitcher, away_pitcher
+
 def get_weather_for_game(city):
+    # ... (no changes in this function)
     if not WEATHER_API_KEY or not city:
         return {'temperature': 70, 'wind_speed': 5, 'humidity': 50}
-    
     url = f"https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/{city}/today?unitGroup=us&include=current&key={WEATHER_API_KEY}&contentType=json"
-    
     try:
         response = requests.get(url)
         response.raise_for_status()
@@ -94,35 +119,32 @@ def get_weather_for_game(city):
 
 @app.route('/games')
 def get_games():
+    # ... (no changes in this function)
     if not ODDS_API_KEY:
         return jsonify({'error': 'API key is not configured on the server.'}), 500
-    
-    url = f"https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?apiKey={ODDS_API_KEY}&regions=us&markets=totals"
+    url = f"https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?apiKey={ODDS_API_KEY}&regions=us&markets=totals,pitcher_strikeouts"
     try:
         response = requests.get(url)
         response.raise_for_status()
         games = response.json()
         now_utc = datetime.now(timezone.utc)
-        upcoming_games = [
-            g for g in games 
-            if datetime.fromisoformat(g['commence_time'].replace('Z', '+00:00')) > now_utc
-        ]
+        upcoming_games = [g for g in games if datetime.fromisoformat(g['commence_time'].replace('Z', '+00:00')) > now_utc]
         return jsonify(upcoming_games)
     except requests.exceptions.RequestException as e:
         return jsonify({'error': f'Failed to fetch data from The Odds API: {e}'}), 502
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    if model is None or features_df is None:
+    if model is None or team_features_df is None or pitcher_features_df is None:
         return jsonify({'error': 'Server is not ready; model or features not loaded.'}), 503
 
     try:
-        data = request.get_json()
-        home_team_full = data.get('home_team')
-        away_team_full = data.get('away_team')
+        game_data = request.get_json()
+        home_team_full = game_data.get('home_team')
+        away_team_full = game_data.get('away_team')
 
         if not all([home_team_full, away_team_full]):
-            return jsonify({'error': 'Missing home_team or away_team in request body'}), 400
+            return jsonify({'error': 'Missing team data in request body'}), 400
 
         home_abbr = TEAM_NAME_MAP.get(home_team_full, home_team_full)
         away_abbr = TEAM_NAME_MAP.get(away_team_full, away_team_full)
@@ -130,8 +152,9 @@ def predict():
         home_city = CITY_MAP.get(home_abbr)
         weather = get_weather_for_game(home_city)
 
-        home_feats_row = features_df[features_df['team'] == home_abbr]
-        away_feats_row = features_df[features_df['team'] == away_abbr]
+        # --- CHANGE: Get team features from the new team_features_df ---
+        home_feats_row = team_features_df[team_features_df['team'] == home_abbr]
+        away_feats_row = team_features_df[team_features_df['team'] == away_abbr]
 
         if home_feats_row.empty or away_feats_row.empty:
             missing_team = home_abbr if home_feats_row.empty else away_abbr
@@ -140,39 +163,41 @@ def predict():
         home_feats = home_feats_row.iloc[0].to_dict()
         away_feats = away_feats_row.iloc[0].to_dict()
         
-        # --- FINAL FIX: Construct the feature vector to match the NEW retrained model ---
+        # --- NEW: Get specific pitcher stats ---
+        home_pitcher_name, away_pitcher_name = get_probable_pitchers(game_data)
+        
+        home_pitcher_stats = pitcher_features_df[pitcher_features_df['player_name'] == home_pitcher_name] if home_pitcher_name else pd.DataFrame()
+        away_pitcher_stats = pitcher_features_df[pitcher_features_df['player_name'] == away_pitcher_name] if away_pitcher_name else pd.DataFrame()
+
+        # Use the specific pitcher's ERA if found, otherwise fall back to the team's average starter ERA
+        home_starter_era = home_pitcher_stats.iloc[0]['starter_rolling_adj_era'] if not home_pitcher_stats.empty else home_feats.get('starter_rolling_adj_era')
+        away_starter_era = away_pitcher_stats.iloc[0]['starter_rolling_adj_era'] if not away_pitcher_stats.empty else away_feats.get('starter_rolling_adj_era')
+
+        # --- FINAL FIX: Construct the feature vector for the NEW retrained model ---
         final_features_dict = {
             'rolling_avg_adj_hits_home': home_feats.get('rolling_avg_adj_hits'),
             'rolling_avg_adj_homers_home': home_feats.get('rolling_avg_adj_homers'),
-            'starter_rolling_adj_era_home': home_feats.get('starter_rolling_adj_era'),
+            'starter_rolling_adj_era_home': home_starter_era, # Use specific pitcher's ERA
             'rolling_avg_adj_hits_away': away_feats.get('rolling_avg_adj_hits'),
             'rolling_avg_adj_homers_away': away_feats.get('rolling_avg_adj_homers'),
-            'starter_rolling_adj_era_away': away_feats.get('starter_rolling_adj_era'),
+            'starter_rolling_adj_era_away': away_starter_era, # Use specific pitcher's ERA
             'park_factor': home_feats.get('park_factor'),
             'bullpen_ip_last_3_days_home': home_feats.get('bullpen_ip_last_3_days'),
             'bullpen_ip_last_3_days_away': away_feats.get('bullpen_ip_last_3_days'),
-            
-            # --- CHANGE: Uncommented the weather features ---
             'temperature': weather['temperature'],
             'wind_speed': weather['wind_speed'],
             'humidity': weather['humidity'],
         }
 
-        # Create a DataFrame and ensure column order matches the model's expectations
         prediction_df = pd.DataFrame([final_features_dict])[MODEL_FEATURES]
-        
         prediction = model.predict(prediction_df)
         
         return jsonify({'predicted_total_runs': float(prediction[0])})
 
     except KeyError as e:
-        return jsonify({
-            'error': f'Feature mismatch error. Model expected a feature that was not provided: {e}',
-            'provided_features': list(final_features_dict.keys()),
-            'expected_features': MODEL_FEATURES
-        }), 400
+        return jsonify({'error': f'Feature mismatch error: {e}', 'expected': MODEL_FEATURES}), 400
     except Exception as e:
-        return jsonify({'error': f'An unexpected error occurred during prediction: {str(e)}'}), 500
+        return jsonify({'error': f'An unexpected error occurred: {str(e)}'}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
