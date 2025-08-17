@@ -77,7 +77,6 @@ CITY_MAP = {
 def get_probable_pitchers(game_data):
     home_pitcher, away_pitcher = None, None
     try:
-        # This logic is a best-effort attempt; The Odds API doesn't guarantee pitcher data
         for bookmaker in game_data.get('bookmakers', []):
             for market in bookmaker.get('markets', []):
                 if 'pitcher' in market.get('key', ''):
@@ -161,10 +160,10 @@ def predict():
         home_pitcher_stats = pitcher_features_df[pitcher_features_df['player_name'] == home_pitcher_name] if home_pitcher_name else pd.DataFrame()
         away_pitcher_stats = pitcher_features_df[pitcher_features_df['player_name'] == away_pitcher_name] if away_pitcher_name else pd.DataFrame()
 
-        # --- FIX: Ensure all feature values are explicitly converted to float with sensible defaults ---
         home_starter_era = float(home_pitcher_stats.iloc[0]['starter_rolling_adj_era']) if not home_pitcher_stats.empty else float(home_feats.get('starter_rolling_adj_era', 4.5))
         away_starter_era = float(away_pitcher_stats.iloc[0]['starter_rolling_adj_era']) if not away_pitcher_stats.empty else float(away_feats.get('starter_rolling_adj_era', 4.5))
 
+        # --- FINAL FIX: Construct the feature vector to match the NEW retrained model ---
         final_features_dict = {
             'rolling_avg_adj_hits_home': float(home_feats.get('rolling_avg_adj_hits', 8.0)),
             'rolling_avg_adj_homers_home': float(home_feats.get('rolling_avg_adj_homers', 1.0)),
@@ -174,7 +173,11 @@ def predict():
             'starter_rolling_adj_era_away': away_starter_era,
             'park_factor': float(home_feats.get('park_factor', 9.0)),
             'bullpen_ip_last_3_days_home': float(home_feats.get('bullpen_ip_last_3_days', 0.0)),
+            'bullpen_era_last_7_days_home': float(home_feats.get('bullpen_era_last_7_days', 4.0)),
+            'bullpen_k_per_9_last_7_days_home': float(home_feats.get('bullpen_k_per_9_last_7_days', 9.0)),
             'bullpen_ip_last_3_days_away': float(away_feats.get('bullpen_ip_last_3_days', 0.0)),
+            'bullpen_era_last_7_days_away': float(away_feats.get('bullpen_era_last_7_days', 4.0)),
+            'bullpen_k_per_9_last_7_days_away': float(away_feats.get('bullpen_k_per_9_last_7_days', 9.0)),
             'temperature': weather['temperature'],
             'wind_speed': weather['wind_speed'],
             'humidity': weather['humidity'],
