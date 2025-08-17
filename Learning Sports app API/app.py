@@ -40,6 +40,7 @@ TEAM_NAME_MAP = {
     "OAK": "OAK", "PHI": "PHI", "PIT": "PIT", "SDP": "SD", "SD": "SD", 
     "SFG": "SF", "SF": "SF", "SEA": "SEA", "STL": "STL", "TBR": "TB", 
     "TB": "TB", "TEX": "TEX", "TOR": "TOR", "WSN": "WSH", "WAS": "WSH",
+    # Full names
     "Arizona Diamondbacks": "ARI", "Atlanta Braves": "ATL", "Baltimore Orioles": "BAL",
     "Boston Red Sox": "BOS", "Chicago Cubs": "CHC", "Chicago White Sox": "CHW",
     "Cincinnati Reds": "CIN", "Cleveland Guardians": "CLE", "Colorado Rockies": "COL",
@@ -50,14 +51,16 @@ TEAM_NAME_MAP = {
     "Pittsburgh Pirates": "PIT", "San Diego Padres": "SD", "San Francisco Giants": "SF",
     "Seattle Mariners": "SEA", "St. Louis Cardinals": "STL", "Tampa Bay Rays": "TB",
     "Texas Rangers": "TEX", "Toronto Blue Jays": "TOR", "Washington Nationals": "WSH",
-    "Diamondbacks": "ARI", "Braves": "ATL", "Orioles": "BAL", "Red Sox": "BOS",
+    # Nicknames / alternate names
+    "Diamondbacks": "ARI", "D-backs": "ARI", "Braves": "ATL", "Orioles": "BAL", "Red Sox": "BOS",
     "Cubs": "CHC", "White Sox": "CHW", "Reds": "CIN", "Guardians": "CLE",
     "Indians": "CLE", "Rockies": "COL", "Angels": "LAA", "Dodgers": "LAD",
     "Marlins": "MIA", "Brewers": "MIL", "Twins": "MIN", "Mets": "NYM",
     "Yankees": "NYY", "Athletics": "OAK", "Phillies": "PHI", "Pirates": "PIT",
     "Padres": "SD", "Giants": "SF", "Mariners": "SEA", "Cardinals": "STL",
     "Rays": "TB", "Rangers": "TEX", "Blue Jays": "TOR", "Nationals": "WSH",
-    "ARZ": "ARI", "CWS": "CHW", "METS": "NYM", "YANKEES": "NYY", "ATH": "OAK"
+    # Other abbreviations
+    "ARZ": "ARI", "AZ": "ARI", "CWS": "CHW", "METS": "NYM", "YANKEES": "NYY", "ATH": "OAK"
 }
 
 # --- API ENDPOINTS ---
