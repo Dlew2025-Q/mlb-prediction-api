@@ -106,17 +106,30 @@ def predict():
         home_feats = home_feats_row.iloc[0].to_dict()
         away_feats = away_feats_row.iloc[0].to_dict()
         
-        # --- CHANGE: Construct feature vector with NEW opponent-adjusted feature names ---
+        # --- FIX: Construct feature vector to match the OLD model's expectations ---
+        # The KEYS here are the OLD feature names the model was trained on.
+        # The VALUES come from the NEW opponent-adjusted columns in latest_features.pkl.
         final_features_dict = {
-            'rolling_avg_adj_hits_home': home_feats.get('rolling_avg_adj_hits'),
-            'rolling_avg_adj_homers_home': home_feats.get('rolling_avg_adj_homers'),
-            'starter_rolling_adj_era_home': home_feats.get('starter_rolling_adj_era'),
-            'rolling_avg_adj_hits_away': away_feats.get('rolling_avg_adj_hits'),
-            'rolling_avg_adj_homers_away': away_feats.get('rolling_avg_adj_homers'),
-            'starter_rolling_adj_era_away': away_feats.get('starter_rolling_adj_era'),
-            # Add any other new/old features your retrained model expects.
-            # For example, if you kept park factors:
-            # 'park_factor_avg_runs': home_feats.get('park_factor_avg_runs'),
+            'rolling_avg_hits_home': home_feats.get('rolling_avg_adj_hits'),
+            'rolling_avg_homers_home': home_feats.get('rolling_avg_adj_homers'),
+            'starter_rolling_era_home_starter': home_feats.get('starter_rolling_adj_era'),
+            'rolling_avg_hits_away': away_feats.get('rolling_avg_adj_hits'),
+            'rolling_avg_homers_away': away_feats.get('rolling_avg_adj_homers'),
+            'starter_rolling_era_away_starter': away_feats.get('starter_rolling_adj_era'),
+            
+            # --- Add placeholders for other features the old model expects ---
+            'starter_rolling_ks_home_starter': 5.0, # Placeholder
+            'starter_rolling_ks_away_starter': 5.0, # Placeholder
+            'bullpen_rolling_era_home_bullpen': 4.0, # Placeholder
+            'bullpen_rolling_era_away_bullpen': 4.0, # Placeholder
+            'rolling_avg_hot_hitters_home_hotness': 10.0, # Placeholder
+            'rolling_avg_hot_hitters_away_hotness': 10.0, # Placeholder
+            'temperature': 70,
+            'wind_speed': 5,
+            'humidity': 50,
+            'park_factor_avg_runs': 9.0, # Placeholder
+            'opening_line': 8.5, # Placeholder
+            'line_movement': 0 # Placeholder
         }
 
         # Create a DataFrame and ensure column order matches the model's expectations
