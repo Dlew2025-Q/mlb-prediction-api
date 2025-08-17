@@ -32,6 +32,9 @@ except Exception as e:
 
 # --- CONFIGURATION & UTILITIES ---
 ODDS_API_KEY = os.environ.get('ODDS_API_KEY')
+# NEW: Add your Weather API Key
+WEATHER_API_KEY = os.environ.get('WEATHER_API_KEY')
+
 TEAM_NAME_MAP = {
     "ARI": "ARI", "ATL": "ATL", "BAL": "BAL", "BOS": "BOS", "CHC": "CHC", 
     "CHW": "CHW", "CIN": "CIN", "CLE": "CLE", "COL": "COL", "DET": "DET", 
@@ -40,7 +43,6 @@ TEAM_NAME_MAP = {
     "OAK": "OAK", "PHI": "PHI", "PIT": "PIT", "SDP": "SD", "SD": "SD", 
     "SFG": "SF", "SF": "SF", "SEA": "SEA", "STL": "STL", "TBR": "TB", 
     "TB": "TB", "TEX": "TEX", "TOR": "TOR", "WSN": "WSH", "WAS": "WSH",
-    # Full names
     "Arizona Diamondbacks": "ARI", "Atlanta Braves": "ATL", "Baltimore Orioles": "BAL",
     "Boston Red Sox": "BOS", "Chicago Cubs": "CHC", "Chicago White Sox": "CHW",
     "Cincinnati Reds": "CIN", "Cleveland Guardians": "CLE", "Colorado Rockies": "COL",
@@ -51,7 +53,6 @@ TEAM_NAME_MAP = {
     "Pittsburgh Pirates": "PIT", "San Diego Padres": "SD", "San Francisco Giants": "SF",
     "Seattle Mariners": "SEA", "St. Louis Cardinals": "STL", "Tampa Bay Rays": "TB",
     "Texas Rangers": "TEX", "Toronto Blue Jays": "TOR", "Washington Nationals": "WSH",
-    # Nicknames / alternate names
     "Diamondbacks": "ARI", "D-backs": "ARI", "Braves": "ATL", "Orioles": "BAL", "Red Sox": "BOS",
     "Cubs": "CHC", "White Sox": "CHW", "Reds": "CIN", "Guardians": "CLE",
     "Indians": "CLE", "Rockies": "COL", "Angels": "LAA", "Dodgers": "LAD",
@@ -59,9 +60,45 @@ TEAM_NAME_MAP = {
     "Yankees": "NYY", "Athletics": "OAK", "Phillies": "PHI", "Pirates": "PIT",
     "Padres": "SD", "Giants": "SF", "Mariners": "SEA", "Cardinals": "STL",
     "Rays": "TB", "Rangers": "TEX", "Blue Jays": "TOR", "Nationals": "WSH",
-    # Other abbreviations
     "ARZ": "ARI", "AZ": "ARI", "CWS": "CHW", "METS": "NYM", "YANKEES": "NYY", "ATH": "OAK"
 }
+
+# NEW: Map for team abbreviations to their home city for the weather API
+CITY_MAP = {
+    "ARI": "Phoenix,AZ", "ATL": "Atlanta,GA", "BAL": "Baltimore,MD", "BOS": "Boston,MA", "CHC": "Chicago,IL",
+    "CHW": "Chicago,IL", "CIN": "Cincinnati,OH", "CLE": "Cleveland,OH", "COL": "Denver,CO", "DET": "Detroit,MI",
+    "HOU": "Houston,TX", "KC": "Kansas City,MO", "LAA": "Anaheim,CA", "LAD": "Los Angeles,CA", "MIA": "Miami,FL",
+    "MIL": "Milwaukee,WI", "MIN": "Minneapolis,MN", "NYM": "Queens,NY", "NYY": "Bronx,NY", "OAK": "Oakland,CA",
+    "PHI": "Philadelphia,PA", "PIT": "Pittsburgh,PA", "SD": "San Diego,CA", "SF": "San Francisco,CA",
+    "SEA": "Seattle,WA", "STL": "St. Louis,MO", "TB": "St. Petersburg,FL", "TEX": "Arlington,TX",
+    "TOR": "Toronto,ON", "WSH": "Washington,DC"
+}
+
+# --- NEW: Weather Fetching Function ---
+def get_weather_for_game(city):
+    """Fetches weather data for a given city using the Visual Crossing API."""
+    if not WEATHER_API_KEY or not city:
+        # Return default values if key or city is missing
+        return {'temperature': 70, 'wind_speed': 5, 'humidity': 50}
+    
+    url = f"https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/{city}/today?unitGroup=us&include=current&key={WEATHER_API_KEY}&contentType=json"
+    
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        weather_data = response.json()
+        
+        current_conditions = weather_data.get('currentConditions', {})
+        
+        return {
+            'temperature': current_conditions.get('temp', 70),
+            'wind_speed': current_conditions.get('windspeed', 5),
+            'humidity': current_conditions.get('humidity', 50)
+        }
+    except requests.exceptions.RequestException as e:
+        print(f"Warning: Could not fetch weather data for {city}. Error: {e}")
+        # Return default values on API failure
+        return {'temperature': 70, 'wind_speed': 5, 'humidity': 50}
 
 # --- API ENDPOINTS ---
 @app.route('/games')
@@ -99,6 +136,10 @@ def predict():
         home_abbr = TEAM_NAME_MAP.get(home_team_full, home_team_full)
         away_abbr = TEAM_NAME_MAP.get(away_team_full, away_team_full)
 
+        # NEW: Fetch live weather for the home team's city
+        home_city = CITY_MAP.get(home_abbr)
+        weather = get_weather_for_game(home_city)
+
         home_feats_row = features_df[features_df['team'] == home_abbr]
         away_feats_row = features_df[features_df['team'] == away_abbr]
 
@@ -109,30 +150,21 @@ def predict():
         home_feats = home_feats_row.iloc[0].to_dict()
         away_feats = away_feats_row.iloc[0].to_dict()
         
-        # --- FIX: Construct feature vector to match the OLD model's expectations ---
-        # The KEYS here are the OLD feature names the model was trained on.
-        # The VALUES come from the NEW opponent-adjusted columns in latest_features.pkl.
         final_features_dict = {
-            'rolling_avg_hits_home': home_feats.get('rolling_avg_adj_hits'),
-            'rolling_avg_homers_home': home_feats.get('rolling_avg_adj_homers'),
-            'starter_rolling_era_home_starter': home_feats.get('starter_rolling_adj_era'),
-            'rolling_avg_hits_away': away_feats.get('rolling_avg_adj_hits'),
-            'rolling_avg_homers_away': away_feats.get('rolling_avg_adj_homers'),
-            'starter_rolling_era_away_starter': away_feats.get('starter_rolling_adj_era'),
+            'rolling_avg_adj_hits_home': home_feats.get('rolling_avg_adj_hits'),
+            'rolling_avg_adj_homers_home': home_feats.get('rolling_avg_adj_homers'),
+            'starter_rolling_adj_era_home': home_feats.get('starter_rolling_adj_era'),
+            'rolling_avg_adj_hits_away': away_feats.get('rolling_avg_adj_hits'),
+            'rolling_avg_adj_homers_away': away_feats.get('rolling_avg_adj_homers'),
+            'starter_rolling_adj_era_away': away_feats.get('starter_rolling_adj_era'),
             
-            # --- Add placeholders for other features the old model expects ---
-            'starter_rolling_ks_home_starter': 5.0, # Placeholder
-            'starter_rolling_ks_away_starter': 5.0, # Placeholder
-            'bullpen_rolling_era_home_bullpen': 4.0, # Placeholder
-            'bullpen_rolling_era_away_bullpen': 4.0, # Placeholder
-            'rolling_avg_hot_hitters_home_hotness': 10.0, # Placeholder
-            'rolling_avg_hot_hitters_away_hotness': 10.0, # Placeholder
-            'temperature': 70,
-            'wind_speed': 5,
-            'humidity': 50,
-            'park_factor_avg_runs': 9.0, # Placeholder
-            'opening_line': 8.5, # Placeholder
-            'line_movement': 0 # Placeholder
+            # NEW: Use live weather data instead of placeholders
+            'temperature': weather['temperature'],
+            'wind_speed': weather['wind_speed'],
+            'humidity': weather['humidity'],
+            
+            # Add placeholders for any other features your model expects
+            'park_factor_avg_runs': 9.0, 
         }
 
         # Create a DataFrame and ensure column order matches the model's expectations
