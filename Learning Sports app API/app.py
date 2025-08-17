@@ -92,7 +92,6 @@ def get_weather_for_game(city):
         print(f"Warning: Could not fetch weather data for {city}. Error: {e}")
         return {'temperature': 70, 'wind_speed': 5, 'humidity': 50}
 
-# --- API ENDPOINTS ---
 @app.route('/games')
 def get_games():
     if not ODDS_API_KEY:
@@ -141,9 +140,7 @@ def predict():
         home_feats = home_feats_row.iloc[0].to_dict()
         away_feats = away_feats_row.iloc[0].to_dict()
         
-        # --- FIX: Reverted to match the OLD model's expectations, but with NEW data ---
-        # The KEYS are the OLD feature names the model was trained on.
-        # The VALUES come from the NEW opponent-adjusted columns and LIVE weather data.
+        # --- CHANGE: Mapping new features to old model's expectations ---
         final_features_dict = {
             'rolling_avg_hits_home': home_feats.get('rolling_avg_adj_hits'),
             'rolling_avg_homers_home': home_feats.get('rolling_avg_adj_homers'),
@@ -152,19 +149,23 @@ def predict():
             'rolling_avg_homers_away': away_feats.get('rolling_avg_adj_homers'),
             'starter_rolling_era_away_starter': away_feats.get('starter_rolling_adj_era'),
             
-            # Use live weather data
             'temperature': weather['temperature'],
             'wind_speed': weather['wind_speed'],
             'humidity': weather['humidity'],
             
-            # Add placeholders for other features the old model expects
+            # NEW: Map park_factor to the old feature name
+            'park_factor_avg_runs': home_feats.get('park_factor'),
+            
+            # NEW: Map bullpen fatigue to an existing placeholder feature.
+            # This is a temporary hack until the model is retrained.
+            'bullpen_rolling_era_home_bullpen': home_feats.get('bullpen_ip_last_3_days'),
+            'bullpen_rolling_era_away_bullpen': away_feats.get('bullpen_ip_last_3_days'),
+
+            # Placeholders for other features the old model expects
             'starter_rolling_ks_home_starter': 5.0,
             'starter_rolling_ks_away_starter': 5.0,
-            'bullpen_rolling_era_home_bullpen': 4.0,
-            'bullpen_rolling_era_away_bullpen': 4.0,
             'rolling_avg_hot_hitters_home_hotness': 10.0,
             'rolling_avg_hot_hitters_away_hotness': 10.0,
-            'park_factor_avg_runs': 9.0,
             'opening_line': 8.5,
             'line_movement': 0
         }
