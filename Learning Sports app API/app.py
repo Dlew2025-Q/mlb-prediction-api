@@ -173,11 +173,15 @@ def predict():
             'starter_rolling_adj_era_away': away_starter_era,
             'park_factor': float(home_feats.get('park_factor', 9.0)),
             'bullpen_ip_last_3_days_home': float(home_feats.get('bullpen_ip_last_3_days', 0.0)),
-            'bullpen_era_last_7_days_home': float(home_feats.get('bullpen_era_last_7_days', 4.0)),
-            'bullpen_k_per_9_last_7_days_home': float(home_feats.get('bullpen_k_per_9_last_7_days', 9.0)),
             'bullpen_ip_last_3_days_away': float(away_feats.get('bullpen_ip_last_3_days', 0.0)),
-            'bullpen_era_last_7_days_away': float(away_feats.get('bullpen_era_last_7_days', 4.0)),
-            'bullpen_k_per_9_last_7_days_away': float(away_feats.get('bullpen_k_per_9_last_7_days', 9.0)),
+            
+            # --- NEW: Add the "hot streak" features ---
+            'rolling_avg_adj_hits_last_3_games_home': float(home_feats.get('rolling_avg_adj_hits_last_3_games', 8.0)),
+            'rolling_avg_adj_homers_last_3_games_home': float(home_feats.get('rolling_avg_adj_homers_last_3_games', 1.0)),
+            'rolling_avg_adj_hits_last_3_games_away': float(away_feats.get('rolling_avg_adj_hits_last_3_games', 8.0)),
+            'rolling_avg_adj_homers_last_3_games_away': float(away_feats.get('rolling_avg_adj_homers_last_3_games', 1.0)),
+
+            # (Assuming your new model was trained on weather)
             'temperature': weather['temperature'],
             'wind_speed': weather['wind_speed'],
             'humidity': weather['humidity'],
