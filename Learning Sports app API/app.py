@@ -25,7 +25,7 @@ def load_pickle(path):
 # Load all models and feature files
 mlb_model = load_pickle('mlb_total_runs_model.pkl')
 nfl_model = load_pickle('nfl_total_points_model.pkl')
-mlb_features_dict = load_pickle('latest_features.pkl') # Assuming this is the MLB one
+mlb_features_dict = load_pickle('latest_features.pkl') # Main MLB features
 nfl_features_df = load_pickle('latest_nfl_features.pkl')
 
 # Unpack MLB features if they exist
@@ -40,12 +40,10 @@ else:
 ODDS_API_KEY = os.environ.get('ODDS_API_KEY')
 WEATHER_API_KEY = os.environ.get('WEATHER_API_KEY')
 
-# (Include your full MLB_TEAM_NAME_MAP and CITY_MAP here from the previous version)
 MLB_TEAM_NAME_MAP = { "ARI": "ARI", "ATL": "ATL", "BAL": "BAL", "BOS": "BOS", "CHC": "CHC", "CHW": "CHW", "CIN": "CIN", "CLE": "CLE", "COL": "COL", "DET": "DET", "HOU": "HOU", "KCR": "KC", "KC": "KC", "LAA": "LAA", "LAD": "LAD", "MIA": "MIA", "MIL": "MIL", "MIN": "MIN", "NYM": "NYM", "NYY": "NYY", "OAK": "OAK", "PHI": "PHI", "PIT": "PIT", "SDP": "SD", "SD": "SD", "SFG": "SF", "SF": "SF", "SEA": "SEA", "STL": "STL", "TBR": "TB", "TB": "TB", "TEX": "TEX", "TOR": "TOR", "WSN": "WSH", "WAS": "WSH", "Arizona Diamondbacks": "ARI", "Atlanta Braves": "ATL", "Baltimore Orioles": "BAL", "Boston Red Sox": "BOS", "Chicago Cubs": "CHC", "Chicago White Sox": "CHW", "Cincinnati Reds": "CIN", "Cleveland Guardians": "CLE", "Colorado Rockies": "COL", "Detroit Tigers": "DET", "Houston Astros": "HOU", "Kansas City Royals": "KC", "Los Angeles Angels": "LAA", "Los Angeles Dodgers": "LAD", "Miami Marlins": "MIA", "Milwaukee Brewers": "MIL", "Minnesota Twins": "MIN", "New York Mets": "NYM", "New York Yankees": "NYY", "Oakland Athletics": "OAK", "Philadelphia Phillies": "PHI", "Pittsburgh Pirates": "PIT", "San Diego Padres": "SD", "San Francisco Giants": "SF", "Seattle Mariners": "SEA", "St. Louis Cardinals": "STL", "Tampa Bay Rays": "TB", "Texas Rangers": "TEX", "Toronto Blue Jays": "TOR", "Washington Nationals": "WSH", "Diamondbacks": "ARI", "D-backs": "ARI", "Braves": "ATL", "Orioles": "BAL", "Red Sox": "BOS", "Cubs": "CHC", "White Sox": "CHW", "Reds": "CIN", "Guardians": "CLE", "Indians": "CLE", "Rockies": "COL", "Angels": "LAA", "Dodgers": "LAD", "Marlins": "MIA", "Brewers": "MIL", "Twins": "MIN", "Mets": "NYM", "Yankees": "NYY", "Athletics": "OAK", "Phillies": "PHI", "Pirates": "PIT", "Padres": "SD", "Giants": "SF", "Mariners": "SEA", "Cardinals": "STL", "Rays": "TB", "Rangers": "TEX", "Blue Jays": "TOR", "Nationals": "WSH", "ARZ": "ARI", "AZ": "ARI", "CWS": "CHW", "METS": "NYM", "YANKEES": "NYY", "ATH": "OAK" }
 CITY_MAP = { "ARI": "Phoenix,AZ", "ATL": "Atlanta,GA", "BAL": "Baltimore,MD", "BOS": "Boston,MA", "CHC": "Chicago,IL", "CHW": "Chicago,IL", "CIN": "Cincinnati,OH", "CLE": "Cleveland,OH", "COL": "Denver,CO", "DET": "Detroit,MI", "HOU": "Houston,TX", "KC": "Kansas City,MO", "LAA": "Anaheim,CA", "LAD": "Los Angeles,CA", "MIA": "Miami,FL", "MIL": "Milwaukee,WI", "MIN": "Minneapolis,MN", "NYM": "Queens,NY", "NYY": "Bronx,NY", "OAK": "Oakland,CA", "PHI": "Philadelphia,PA", "PIT": "Pittsburgh,PA", "SD": "San Diego,CA", "SF": "San Francisco,CA", "SEA": "Seattle,WA", "STL": "St. Louis,MO", "TB": "St. Petersburg,FL", "TEX": "Arlington,TX", "TOR": "Toronto,ON", "WSH": "Washington,DC" }
 
 
-# --- (Include your get_weather_for_game and get_probable_pitchers helper functions here) ---
 def get_weather_for_game(city):
     if not WEATHER_API_KEY or not city: return {'temperature': 70.0, 'wind_speed': 5.0, 'humidity': 50.0}
     url = f"https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/{city}/today?unitGroup=us&include=current&key={WEATHER_API_KEY}&contentType=json"
@@ -125,8 +123,20 @@ def predict(sport):
         home_starter_era = float(home_pitcher_stats.iloc[0]['starter_rolling_adj_era']) if not home_pitcher_stats.empty else float(home_feats.get('starter_rolling_adj_era', 4.5))
         away_starter_era = float(away_pitcher_stats.iloc[0]['starter_rolling_adj_era']) if not away_pitcher_stats.empty else float(away_feats.get('starter_rolling_adj_era', 4.5))
 
+        # --- FIX: Completed the MLB feature dictionary ---
         final_features = {
-            # (Insert your final, working MLB feature dictionary here)
+            'rolling_avg_adj_hits_home': float(home_feats.get('rolling_avg_adj_hits', 8.0)),
+            'rolling_avg_adj_homers_home': float(home_feats.get('rolling_avg_adj_homers', 1.0)),
+            'starter_rolling_adj_era_home': home_starter_era,
+            'park_factor': float(home_feats.get('park_factor', 9.0)),
+            'bullpen_ip_last_3_days_home': float(home_feats.get('bullpen_ip_last_3_days', 0.0)),
+            'rolling_avg_adj_hits_away': float(away_feats.get('rolling_avg_adj_hits', 8.0)),
+            'rolling_avg_adj_homers_away': float(away_feats.get('rolling_avg_adj_homers', 1.0)),
+            'starter_rolling_adj_era_away': away_starter_era,
+            'bullpen_ip_last_3_days_away': float(away_feats.get('bullpen_ip_last_3_days', 0.0)),
+            'temperature': weather['temperature'],
+            'wind_speed': weather['wind_speed'],
+            'humidity': weather['humidity'],
         }
         
     elif sport == "nfl":
@@ -143,10 +153,10 @@ def predict(sport):
         away_feats = away_feats_row.iloc[0].to_dict()
 
         final_features = {
-            'rolling_avg_adj_pts_scored_home': float(home_feats.get('rolling_avg_adj_pts_scored', 21.0)),
-            'rolling_avg_adj_pts_allowed_home': float(home_feats.get('rolling_avg_adj_pts_allowed', 21.0)),
-            'rolling_avg_adj_pts_scored_away': float(away_feats.get('rolling_avg_adj_pts_scored', 21.0)),
-            'rolling_avg_adj_pts_allowed_away': float(away_feats.get('rolling_avg_adj_pts_allowed', 21.0)),
+            'rolling_avg_adj_pts_scored_home': float(home_feats.get('rolling_avg_adj_pts_scored_home', 21.0)),
+            'rolling_avg_adj_pts_allowed_home': float(home_feats.get('rolling_avg_adj_pts_allowed_home', 21.0)),
+            'rolling_avg_adj_pts_scored_away': float(away_feats.get('rolling_avg_adj_pts_scored_away', 21.0)),
+            'rolling_avg_adj_pts_allowed_away': float(away_feats.get('rolling_avg_adj_pts_allowed_away', 21.0)),
         }
         
     else:
