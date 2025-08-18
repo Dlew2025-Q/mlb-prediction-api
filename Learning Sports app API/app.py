@@ -22,48 +22,32 @@ except Exception as e:
     print(f"CRITICAL ERROR: Could not load model. Error: {e}")
 
 try:
+    # The pkl file now contains a single DataFrame with all the latest features
     with open('latest_features.pkl', 'rb') as file:
-        features_dict = pickle.load(file)
-        team_features_df = features_dict['team_features']
-        pitcher_features_df = features_dict['pitcher_features']
-    print("Pre-computed team and pitcher features loaded successfully.")
+        features_df = pickle.load(file)
+    print("Pre-computed features loaded successfully.")
 except Exception as e:
-    team_features_df = None
-    pitcher_features_df = None
+    features_df = None
     print(f"CRITICAL ERROR: Could not load pre-computed features. Error: {e}")
 
 # --- CONFIGURATION & UTILITIES ---
 ODDS_API_KEY = os.environ.get('ODDS_API_KEY')
 WEATHER_API_KEY = os.environ.get('WEATHER_API_KEY')
-
 TEAM_NAME_MAP = {
-    "ARI": "ARI", "ATL": "ATL", "BAL": "BAL", "BOS": "BOS", "CHC": "CHC", 
-    "CHW": "CHW", "CIN": "CIN", "CLE": "CLE", "COL": "COL", "DET": "DET", 
-    "HOU": "HOU", "KCR": "KC", "KC": "KC", "LAA": "LAA", "LAD": "LAD", 
-    "MIA": "MIA", "MIL": "MIL", "MIN": "MIN", "NYM": "NYM", "NYY": "NYY", 
-    "OAK": "OAK", "PHI": "PHI", "PIT": "PIT", "SDP": "SD", "SD": "SD", 
-    "SFG": "SF", "SF": "SF", "SEA": "SEA", "STL": "STL", "TBR": "TB", 
-    "TB": "TB", "TEX": "TEX", "TOR": "TOR", "WSN": "WSH", "WAS": "WSH",
-    "Arizona Diamondbacks": "ARI", "Atlanta Braves": "ATL", "Baltimore Orioles": "BAL",
-    "Boston Red Sox": "BOS", "Chicago Cubs": "CHC", "Chicago White Sox": "CHW",
-    "Cincinnati Reds": "CIN", "Cleveland Guardians": "CLE", "Colorado Rockies": "COL",
-    "Detroit Tigers": "DET", "Houston Astros": "HOU", "Kansas City Royals": "KC",
-    "Los Angeles Angels": "LAA", "Los Angeles Dodgers": "LAD", "Miami Marlins": "MIA",
-    "Milwaukee Brewers": "MIL", "Minnesota Twins": "MIN", "New York Mets": "NYM",
-    "New York Yankees": "NYY", "Oakland Athletics": "OAK", "Philadelphia Phillies": "PHI",
-    "Pittsburgh Pirates": "PIT", "San Diego Padres": "SD", "San Francisco Giants": "SF",
-    "Seattle Mariners": "SEA", "St. Louis Cardinals": "STL", "Tampa Bay Rays": "TB",
-    "Texas Rangers": "TEX", "Toronto Blue Jays": "TOR", "Washington Nationals": "WSH",
-    "Diamondbacks": "ARI", "D-backs": "ARI", "Braves": "ATL", "Orioles": "BAL", "Red Sox": "BOS",
-    "Cubs": "CHC", "White Sox": "CHW", "Reds": "CIN", "Guardians": "CLE",
-    "Indians": "CLE", "Rockies": "COL", "Angels": "LAA", "Dodgers": "LAD",
-    "Marlins": "MIA", "Brewers": "MIL", "Twins": "MIN", "Mets": "NYM",
-    "Yankees": "NYY", "Athletics": "OAK", "Phillies": "PHI", "Pirates": "PIT",
-    "Padres": "SD", "Giants": "SF", "Mariners": "SEA", "Cardinals": "STL",
-    "Rays": "TB", "Rangers": "TEX", "Blue Jays": "TOR", "Nationals": "WSH",
+    "ARI": "ARI", "ATL": "ATL", "BAL": "BAL", "BOS": "BOS", "CHC": "CHC", "CHW": "CHW", "CIN": "CIN", "CLE": "CLE", "COL": "COL", "DET": "DET",
+    "HOU": "HOU", "KCR": "KC", "KC": "KC", "LAA": "LAA", "LAD": "LAD", "MIA": "MIA", "MIL": "MIL", "MIN": "MIN", "NYM": "NYM", "NYY": "NYY",
+    "OAK": "OAK", "PHI": "PHI", "PIT": "PIT", "SDP": "SD", "SD": "SD", "SFG": "SF", "SF": "SF", "SEA": "SEA", "STL": "STL", "TBR": "TB",
+    "TB": "TB", "TEX": "TEX", "TOR": "TOR", "WSN": "WSH", "WAS": "WSH", "Arizona Diamondbacks": "ARI", "Atlanta Braves": "ATL", "Baltimore Orioles": "BAL",
+    "Boston Red Sox": "BOS", "Chicago Cubs": "CHC", "Chicago White Sox": "CHW", "Cincinnati Reds": "CIN", "Cleveland Guardians": "CLE", "Colorado Rockies": "COL",
+    "Detroit Tigers": "DET", "Houston Astros": "HOU", "Kansas City Royals": "KC", "Los Angeles Angels": "LAA", "Los Angeles Dodgers": "LAD", "Miami Marlins": "MIA",
+    "Milwaukee Brewers": "MIL", "Minnesota Twins": "MIN", "New York Mets": "NYM", "New York Yankees": "NYY", "Oakland Athletics": "OAK", "Philadelphia Phillies": "PHI",
+    "Pittsburgh Pirates": "PIT", "San Diego Padres": "SD", "San Francisco Giants": "SF", "Seattle Mariners": "SEA", "St. Louis Cardinals": "STL", "Tampa Bay Rays": "TB",
+    "Texas Rangers": "TEX", "Toronto Blue Jays": "TOR", "Washington Nationals": "WSH", "Diamondbacks": "ARI", "D-backs": "ARI", "Braves": "ATL", "Orioles": "BAL", "Red Sox": "BOS",
+    "Cubs": "CHC", "White Sox": "CHW", "Reds": "CIN", "Guardians": "CLE", "Indians": "CLE", "Rockies": "COL", "Angels": "LAA", "Dodgers": "LAD",
+    "Marlins": "MIA", "Brewers": "MIL", "Twins": "MIN", "Mets": "NYM", "Yankees": "NYY", "Athletics": "OAK", "Phillies": "PHI", "Pirates": "PIT",
+    "Padres": "SD", "Giants": "SF", "Mariners": "SEA", "Cardinals": "STL", "Rays": "TB", "Rangers": "TEX", "Blue Jays": "TOR", "Nationals": "WSH",
     "ARZ": "ARI", "AZ": "ARI", "CWS": "CHW", "METS": "NYM", "YANKEES": "NYY", "ATH": "OAK"
 }
-
 CITY_MAP = {
     "ARI": "Phoenix,AZ", "ATL": "Atlanta,GA", "BAL": "Baltimore,MD", "BOS": "Boston,MA", "CHC": "Chicago,IL",
     "CHW": "Chicago,IL", "CIN": "Cincinnati,OH", "CLE": "Cleveland,OH", "COL": "Denver,CO", "DET": "Detroit,MI",
@@ -74,25 +58,6 @@ CITY_MAP = {
     "TOR": "Toronto,ON", "WSH": "Washington,DC"
 }
 
-def get_probable_pitchers(game_data):
-    home_pitcher, away_pitcher = None, None
-    try:
-        for bookmaker in game_data.get('bookmakers', []):
-            for market in bookmaker.get('markets', []):
-                if 'pitcher' in market.get('key', ''):
-                    for outcome in market.get('outcomes', []):
-                        pitcher_name = outcome.get('description')
-                        if pitcher_name:
-                            if game_data['home_team'] in outcome['name']:
-                                home_pitcher = pitcher_name
-                            elif game_data['away_team'] in outcome['name']:
-                                away_pitcher = pitcher_name
-                if home_pitcher and away_pitcher:
-                    return home_pitcher, away_pitcher
-    except Exception as e:
-        print(f"Warning: Could not parse pitcher data for game {game_data.get('id')}. Error: {e}")
-    return home_pitcher, away_pitcher
-
 def get_weather_for_game(city):
     if not WEATHER_API_KEY or not city:
         return {'temperature': 70.0, 'wind_speed': 5.0, 'humidity': 50.0}
@@ -102,11 +67,7 @@ def get_weather_for_game(city):
         response.raise_for_status()
         weather_data = response.json()
         current_conditions = weather_data.get('currentConditions', {})
-        return {
-            'temperature': float(current_conditions.get('temp', 70.0)),
-            'wind_speed': float(current_conditions.get('windspeed', 5.0)),
-            'humidity': float(current_conditions.get('humidity', 50.0))
-        }
+        return { 'temperature': float(current_conditions.get('temp', 70.0)), 'wind_speed': float(current_conditions.get('windspeed', 5.0)), 'humidity': float(current_conditions.get('humidity', 50.0)) }
     except requests.exceptions.RequestException as e:
         print(f"Warning: Could not fetch weather data for {city}. Error: {e}")
         return {'temperature': 70.0, 'wind_speed': 5.0, 'humidity': 50.0}
@@ -128,7 +89,7 @@ def get_games():
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    if model is None or team_features_df is None or pitcher_features_df is None:
+    if model is None or features_df is None:
         return jsonify({'error': 'Server is not ready; model or features not loaded.'}), 503
 
     try:
@@ -145,8 +106,8 @@ def predict():
         home_city = CITY_MAP.get(home_abbr)
         weather = get_weather_for_game(home_city)
 
-        home_feats_row = team_features_df[team_features_df['team'] == home_abbr]
-        away_feats_row = team_features_df[team_features_df['team'] == away_abbr]
+        home_feats_row = features_df[features_df['team'] == home_abbr]
+        away_feats_row = features_df[features_df['team'] == away_abbr]
 
         if home_feats_row.empty or away_feats_row.empty:
             missing_team = home_abbr if home_feats_row.empty else away_abbr
@@ -155,33 +116,19 @@ def predict():
         home_feats = home_feats_row.iloc[0].to_dict()
         away_feats = away_feats_row.iloc[0].to_dict()
         
-        home_pitcher_name, away_pitcher_name = get_probable_pitchers(game_data)
-        
-        home_pitcher_stats = pitcher_features_df[pitcher_features_df['player_name'] == home_pitcher_name] if home_pitcher_name else pd.DataFrame()
-        away_pitcher_stats = pitcher_features_df[pitcher_features_df['player_name'] == away_pitcher_name] if away_pitcher_name else pd.DataFrame()
-
-        home_starter_era = float(home_pitcher_stats.iloc[0]['starter_rolling_adj_era']) if not home_pitcher_stats.empty else float(home_feats.get('starter_rolling_adj_era', 4.5))
-        away_starter_era = float(away_pitcher_stats.iloc[0]['starter_rolling_adj_era']) if not away_pitcher_stats.empty else float(away_feats.get('starter_rolling_adj_era', 4.5))
-
         # --- FINAL FIX: Construct the feature vector to match the NEW retrained model ---
         final_features_dict = {
-            'rolling_avg_adj_hits_home': float(home_feats.get('rolling_avg_adj_hits', 8.0)),
-            'rolling_avg_adj_homers_home': float(home_feats.get('rolling_avg_adj_homers', 1.0)),
-            'starter_rolling_adj_era_home': home_starter_era,
-            'rolling_avg_adj_hits_away': float(away_feats.get('rolling_avg_adj_hits', 8.0)),
-            'rolling_avg_adj_homers_away': float(away_feats.get('rolling_avg_adj_homers', 1.0)),
-            'starter_rolling_adj_era_away': away_starter_era,
+            'rolling_avg_adj_hits_home_perf': float(home_feats.get('rolling_avg_adj_hits_home_perf', 8.0)),
+            'rolling_avg_adj_homers_home_perf': float(home_feats.get('rolling_avg_adj_homers_home_perf', 1.0)),
+            'rolling_avg_adj_hits_away_perf': float(away_feats.get('rolling_avg_adj_hits_away_perf', 8.0)),
+            'rolling_avg_adj_homers_away_perf': float(away_feats.get('rolling_avg_adj_homers_away_perf', 1.0)),
+            
+            # (Assuming the rest of the features from the last training are still expected)
+            'starter_rolling_adj_era_home': float(home_feats.get('starter_rolling_adj_era', 4.5)),
+            'starter_rolling_adj_era_away': float(away_feats.get('starter_rolling_adj_era', 4.5)),
             'park_factor': float(home_feats.get('park_factor', 9.0)),
             'bullpen_ip_last_3_days_home': float(home_feats.get('bullpen_ip_last_3_days', 0.0)),
             'bullpen_ip_last_3_days_away': float(away_feats.get('bullpen_ip_last_3_days', 0.0)),
-            
-            # --- NEW: Add the "hot streak" features ---
-            'rolling_avg_adj_hits_last_3_games_home': float(home_feats.get('rolling_avg_adj_hits_last_3_games', 8.0)),
-            'rolling_avg_adj_homers_last_3_games_home': float(home_feats.get('rolling_avg_adj_homers_last_3_games', 1.0)),
-            'rolling_avg_adj_hits_last_3_games_away': float(away_feats.get('rolling_avg_adj_hits_last_3_games', 8.0)),
-            'rolling_avg_adj_homers_last_3_games_away': float(away_feats.get('rolling_avg_adj_homers_last_3_games', 1.0)),
-
-            # (Assuming your new model was trained on weather)
             'temperature': weather['temperature'],
             'wind_speed': weather['wind_speed'],
             'humidity': weather['humidity'],
