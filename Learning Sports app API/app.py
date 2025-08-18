@@ -22,7 +22,6 @@ except Exception as e:
     print(f"CRITICAL ERROR: Could not load model. Error: {e}")
 
 try:
-    # The pkl file now contains a single DataFrame with all the latest features
     with open('latest_features.pkl', 'rb') as file:
         features_df = pickle.load(file)
     print("Pre-computed features loaded successfully.")
@@ -120,8 +119,13 @@ def predict():
         final_features_dict = {
             'rolling_avg_adj_hits_home_perf': float(home_feats.get('rolling_avg_adj_hits_home_perf', 8.0)),
             'rolling_avg_adj_homers_home_perf': float(home_feats.get('rolling_avg_adj_homers_home_perf', 1.0)),
+            'rolling_avg_adj_walks_home_perf': float(home_feats.get('rolling_avg_adj_walks_home_perf', 3.0)),
+            'rolling_avg_adj_strikeouts_home_perf': float(home_feats.get('rolling_avg_adj_strikeouts_home_perf', 8.0)),
+            
             'rolling_avg_adj_hits_away_perf': float(away_feats.get('rolling_avg_adj_hits_away_perf', 8.0)),
             'rolling_avg_adj_homers_away_perf': float(away_feats.get('rolling_avg_adj_homers_away_perf', 1.0)),
+            'rolling_avg_adj_walks_away_perf': float(away_feats.get('rolling_avg_adj_walks_away_perf', 3.0)),
+            'rolling_avg_adj_strikeouts_away_perf': float(away_feats.get('rolling_avg_adj_strikeouts_away_perf', 8.0)),
             
             # (Assuming the rest of the features from the last training are still expected)
             'starter_rolling_adj_era_home': float(home_feats.get('starter_rolling_adj_era', 4.5)),
