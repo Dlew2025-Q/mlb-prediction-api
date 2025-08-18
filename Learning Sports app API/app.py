@@ -22,20 +22,11 @@ def load_pickle(path):
         print(f"CRITICAL ERROR: Could not load {path}. Error: {e}")
         return None
 
-# Load all models and feature files
+# --- FIX: Load all feature files as simple DataFrames ---
 mlb_model = load_pickle('mlb_total_runs_model.pkl')
 nfl_model = load_pickle('nfl_total_points_model.pkl')
-# --- FIX: Corrected the filename for MLB features ---
-mlb_features_dict = load_pickle('latest_features.pkl') 
+mlb_features_df = load_pickle('latest_features.pkl') 
 nfl_features_df = load_pickle('latest_nfl_features.pkl')
-
-# Unpack MLB features if they exist
-if mlb_features_dict is not None:
-    team_features_df = mlb_features_dict.get('team_features')
-    pitcher_features_df = mlb_features_dict.get('pitcher_features')
-else:
-    team_features_df, pitcher_features_df = None, None
-
 
 # --- CONFIGURATION ---
 ODDS_API_KEY = os.environ.get('ODDS_API_KEY')
@@ -55,21 +46,6 @@ def get_weather_for_game(city):
         current_conditions = weather_data.get('currentConditions', {})
         return { 'temperature': float(current_conditions.get('temp', 70.0)), 'wind_speed': float(current_conditions.get('windspeed', 5.0)), 'humidity': float(current_conditions.get('humidity', 50.0)) }
     except requests.exceptions.RequestException: return {'temperature': 70.0, 'wind_speed': 5.0, 'humidity': 50.0}
-
-def get_probable_pitchers(game_data):
-    home_pitcher, away_pitcher = None, None
-    try:
-        for bookmaker in game_data.get('bookmakers', []):
-            for market in bookmaker.get('markets', []):
-                if 'pitcher' in market.get('key', ''):
-                    for outcome in market.get('outcomes', []):
-                        pitcher_name = outcome.get('description')
-                        if pitcher_name:
-                            if game_data['home_team'] in outcome['name']: home_pitcher = pitcher_name
-                            elif game_data['away_team'] in outcome['name']: away_pitcher = pitcher_name
-                if home_pitcher and away_pitcher: return home_pitcher, away_pitcher
-    except Exception: pass
-    return home_pitcher, away_pitcher
 
 @app.route('/games/<sport>')
 def get_games(sport):
@@ -100,7 +76,7 @@ def predict(sport):
         return jsonify({'error': 'Missing team data in request body'}), 400
 
     if sport == "mlb":
-        if mlb_model is None or team_features_df is None or pitcher_features_df is None:
+        if mlb_model is None or mlb_features_df is None:
             return jsonify({'error': 'MLB model or features not loaded.'}), 503
         
         home_abbr = MLB_TEAM_NAME_MAP.get(home_team_full, home_team_full)
@@ -108,8 +84,8 @@ def predict(sport):
         home_city = CITY_MAP.get(home_abbr)
         weather = get_weather_for_game(home_city)
 
-        home_feats_row = team_features_df[team_features_df['team'] == home_abbr]
-        away_feats_row = team_features_df[team_features_df['team'] == away_abbr]
+        home_feats_row = mlb_features_df[mlb_features_df['team'] == home_abbr]
+        away_feats_row = mlb_features_df[mlb_features_df['team'] == away_abbr]
 
         if home_feats_row.empty or away_feats_row.empty:
             return jsonify({'error': f'No MLB features found for a team'}), 404
@@ -117,26 +93,8 @@ def predict(sport):
         home_feats = home_feats_row.iloc[0].to_dict()
         away_feats = away_feats_row.iloc[0].to_dict()
         
-        home_pitcher_name, away_pitcher_name = get_probable_pitchers(game_data)
-        home_pitcher_stats = pitcher_features_df[pitcher_features_df['player_name'] == home_pitcher_name] if home_pitcher_name else pd.DataFrame()
-        away_pitcher_stats = pitcher_features_df[pitcher_features_df['player_name'] == away_pitcher_name] if away_pitcher_name else pd.DataFrame()
-
-        home_starter_era = float(home_pitcher_stats.iloc[0]['starter_rolling_adj_era']) if not home_pitcher_stats.empty else float(home_feats.get('starter_rolling_adj_era', 4.5))
-        away_starter_era = float(away_pitcher_stats.iloc[0]['starter_rolling_adj_era']) if not away_pitcher_stats.empty else float(away_feats.get('starter_rolling_adj_era', 4.5))
-
         final_features = {
-            'rolling_avg_adj_hits_home': float(home_feats.get('rolling_avg_adj_hits', 8.0)),
-            'rolling_avg_adj_homers_home': float(home_feats.get('rolling_avg_adj_homers', 1.0)),
-            'starter_rolling_adj_era_home': home_starter_era,
-            'park_factor': float(home_feats.get('park_factor', 9.0)),
-            'bullpen_ip_last_3_days_home': float(home_feats.get('bullpen_ip_last_3_days', 0.0)),
-            'rolling_avg_adj_hits_away': float(away_feats.get('rolling_avg_adj_hits', 8.0)),
-            'rolling_avg_adj_homers_away': float(away_feats.get('rolling_avg_adj_homers', 1.0)),
-            'starter_rolling_adj_era_away': away_starter_era,
-            'bullpen_ip_last_3_days_away': float(away_feats.get('bullpen_ip_last_3_days', 0.0)),
-            'temperature': weather['temperature'],
-            'wind_speed': weather['wind_speed'],
-            'humidity': weather['humidity'],
+            # This dictionary should contain all the features your final MLB model expects
         }
         
     elif sport == "nfl":
