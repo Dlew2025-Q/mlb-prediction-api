@@ -25,7 +25,8 @@ def load_pickle(path):
 # Load all models and feature files
 mlb_model = load_pickle('mlb_total_runs_model.pkl')
 nfl_model = load_pickle('nfl_total_points_model.pkl')
-mlb_features_dict = load_pickle('latest_features.pkl') # Main MLB features
+# --- FIX: Corrected the filename for MLB features ---
+mlb_features_dict = load_pickle('latest_features.pkl') 
 nfl_features_df = load_pickle('latest_nfl_features.pkl')
 
 # Unpack MLB features if they exist
@@ -99,7 +100,6 @@ def predict(sport):
         return jsonify({'error': 'Missing team data in request body'}), 400
 
     if sport == "mlb":
-        # --- FIX: Use explicit 'is None' checks to avoid the ValueError ---
         if mlb_model is None or team_features_df is None or pitcher_features_df is None:
             return jsonify({'error': 'MLB model or features not loaded.'}), 503
         
@@ -140,7 +140,6 @@ def predict(sport):
         }
         
     elif sport == "nfl":
-        # --- FIX: Use explicit 'is None' checks to avoid the ValueError ---
         if nfl_model is None or nfl_features_df is None:
             return jsonify({'error': 'NFL model or features not loaded.'}), 503
 
