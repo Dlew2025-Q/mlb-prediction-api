@@ -29,7 +29,7 @@ mlb_features_dict = load_pickle('latest_features.pkl') # Main MLB features
 nfl_features_df = load_pickle('latest_nfl_features.pkl')
 
 # Unpack MLB features if they exist
-if mlb_features_dict:
+if mlb_features_dict is not None:
     team_features_df = mlb_features_dict.get('team_features')
     pitcher_features_df = mlb_features_dict.get('pitcher_features')
 else:
@@ -99,7 +99,8 @@ def predict(sport):
         return jsonify({'error': 'Missing team data in request body'}), 400
 
     if sport == "mlb":
-        if not all([mlb_model, team_features_df, pitcher_features_df]):
+        # --- FIX: Use explicit 'is None' checks to avoid the ValueError ---
+        if mlb_model is None or team_features_df is None or pitcher_features_df is None:
             return jsonify({'error': 'MLB model or features not loaded.'}), 503
         
         home_abbr = MLB_TEAM_NAME_MAP.get(home_team_full, home_team_full)
@@ -123,7 +124,6 @@ def predict(sport):
         home_starter_era = float(home_pitcher_stats.iloc[0]['starter_rolling_adj_era']) if not home_pitcher_stats.empty else float(home_feats.get('starter_rolling_adj_era', 4.5))
         away_starter_era = float(away_pitcher_stats.iloc[0]['starter_rolling_adj_era']) if not away_pitcher_stats.empty else float(away_feats.get('starter_rolling_adj_era', 4.5))
 
-        # --- FIX: Completed the MLB feature dictionary ---
         final_features = {
             'rolling_avg_adj_hits_home': float(home_feats.get('rolling_avg_adj_hits', 8.0)),
             'rolling_avg_adj_homers_home': float(home_feats.get('rolling_avg_adj_homers', 1.0)),
@@ -140,7 +140,8 @@ def predict(sport):
         }
         
     elif sport == "nfl":
-        if not all([nfl_model, nfl_features_df]):
+        # --- FIX: Use explicit 'is None' checks to avoid the ValueError ---
+        if nfl_model is None or nfl_features_df is None:
             return jsonify({'error': 'NFL model or features not loaded.'}), 503
 
         home_feats_row = nfl_features_df[nfl_features_df['team'] == home_team_full]
