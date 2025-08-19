@@ -65,28 +65,6 @@ MLB_TEAM_NAME_MAP = {
 # Maps MLB team abbreviations to city and state for weather lookup
 CITY_MAP = { "ARI": "Phoenix,AZ", "ATL": "Atlanta,GA", "BAL": "Baltimore,MD", "BOS": "Boston,MA", "CHC": "Chicago,IL", "CHW": "Chicago,IL", "CIN": "Cincinnati,OH", "CLE": "Cleveland,OH", "COL": "Denver,CO", "DET": "Detroit,MI", "HOU": "Houston,TX", "KC": "Kansas City,MO", "LAA": "Anaheim,CA", "LAD": "Los Angeles,CA", "MIA": "Miami,FL", "MIL": "Milwaukee,WI", "MIN": "Minneapolis,MN", "NYM": "Queens,NY", "NYY": "Bronx,NY", "OAK": "Oakland,CA", "PHI": "Philadelphia,PA", "PIT": "Pittsburgh,PA", "SD": "San Diego,CA", "SF": "San Francisco,CA", "SEA": "Seattle,WA", "STL": "St. Louis,MO", "TB": "St. Petersburg,FL", "TEX": "Arlington,TX", "TOR": "Toronto,ON", "WSH": "Washington,DC" }
 
-# NFL Team mapping to handle variations from different APIs and feature files
-NFL_TEAM_NAME_MAP = {
-    # Full names from Odds API mapped to a simplified format (city name)
-    "Arizona Cardinals": "Arizona", "Atlanta Falcons": "Atlanta", "Baltimore Ravens": "Baltimore", 
-    "Buffalo Bills": "Buffalo", "Carolina Panthers": "Carolina", "Chicago Bears": "Chicago",
-    "Cincinnati Bengals": "Cincinnati", "Cleveland Browns": "Cleveland", "Dallas Cowboys": "Dallas", 
-    "Denver Broncos": "Denver", "Detroit Lions": "Detroit", "Green Bay Packers": "Green Bay", 
-    "Houston Texans": "Houston", "Indianapolis Colts": "Indianapolis", "Jacksonville Jaguars": "Jacksonville", 
-    "Kansas City Chiefs": "Kansas City", "Las Vegas Raiders": "Las Vegas", "Los Angeles Chargers": "Los Angeles",
-    "Los Angeles Rams": "Los Angeles", "Miami Dolphins": "Miami", "Minnesota Vikings": "Minnesota", 
-    "New England Patriots": "New England", "New Orleans Saints": "New Orleans", "New York Giants": "New York",
-    "New York Jets": "New York", "Philadelphia Eagles": "Philadelphia", "Pittsburgh Steelers": "Pittsburgh",
-    "San Francisco 49ers": "San Francisco", "Seattle Seahawks": "Seattle", "Tampa Bay Buccaneers": "Tampa Bay",
-    "Tennessee Titans": "Tennessee", "Washington Commanders": "Washington",
-    # Mappings for common abbreviations
-    "ARI": "Arizona", "ATL": "Atlanta", "BAL": "Baltimore", "BUF": "Buffalo", "CAR": "Carolina", "CHI": "Chicago",
-    "CIN": "Cincinnati", "CLE": "Cleveland", "DAL": "Dallas", "DEN": "Denver", "DET": "Detroit", "GB": "Green Bay",
-    "HOU": "Houston", "IND": "Indianapolis", "JAX": "Jacksonville", "KC": "Kansas City", "LV": "Las Vegas",
-    "LAC": "Los Angeles", "LA": "Los Angeles", "MIA": "Miami", "MIN": "Minnesota", "NE": "New England",
-    "NO": "New Orleans", "NYG": "New York", "NYJ": "New York", "PHI": "Philadelphia", "PIT": "Pittsburgh",
-    "SF": "San Francisco", "SEA": "Seattle", "TB": "Tampa Bay", "TEN": "Tennessee", "WSH": "Washington"
-}
 
 def get_weather_for_game(city):
     """
@@ -198,15 +176,11 @@ def predict(sport):
     elif sport == "nfl":
         if nfl_model is None or nfl_features_df is None:
             return jsonify({'error': 'NFL model or features not loaded.'}), 503
-
-        # Map full team names to a simplified name format
-        home_team_standard = NFL_TEAM_NAME_MAP.get(home_team_full)
-        away_team_standard = NFL_TEAM_NAME_MAP.get(away_team_full)
-
-        # Check if the mapping was successful
-        if not home_team_standard or not away_team_standard:
-            return jsonify({'error': f'Team name mapping failed. Could not find a standard name for {home_team_full} or {away_team_full}.'}), 404
         
+        # Use the team names directly from the API since precompute_features.py uses full names
+        home_team_standard = home_team_full
+        away_team_standard = away_team_full
+
         # Retrieve features for each NFL team using the standardized name
         home_feats_row = nfl_features_df[nfl_features_df['team'] == home_team_standard]
         away_feats_row = nfl_features_df[nfl_features_df['team'] == away_team_standard]
