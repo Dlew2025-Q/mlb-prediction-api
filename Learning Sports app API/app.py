@@ -40,35 +40,53 @@ ODDS_API_KEY = os.environ.get('ODDS_API_KEY')
 WEATHER_API_KEY = os.environ.get('WEATHER_API_KEY')
 
 # Maps various MLB team name formats to a standard abbreviation
-MLB_TEAM_NAME_MAP = { "ARI": "ARI", "ATL": "ATL", "BAL": "BAL", "BOS": "BOS", "CHC": "CHC", "CHW": "CHW", "CIN": "CIN", "CLE": "CLE", "COL": "COL", "DET": "DET", "HOU": "HOU", "KCR": "KC", "KC": "KC", "LAA": "LAA", "LAD": "LAD", "MIA": "MIA", "MIL": "MIL", "MIN": "MIN", "NYM": "NYM", "NYY": "NYY", "OAK": "OAK", "PHI": "PHI", "PIT": "PIT", "SDP": "SD", "SD": "SD", "SFG": "SF", "SF": "SF", "SEA": "SEA", "STL": "STL", "TBR": "TB", "TB": "TB", "TEX": "TEX", "TOR": "TOR", "WSN": "WSH", "WAS": "WSH", "Arizona Diamondbacks": "ARI", "Atlanta Braves": "ATL", "Baltimore Orioles": "BAL", "Boston Red Sox": "BOS", "Chicago Cubs": "CHC", "Chicago White Sox": "CHW", "Cincinnati Reds": "CIN", "Cleveland Guardians": "CLE", "Colorado Rockies": "COL", "Detroit Tigers": "DET", "Houston Astros": "HOU", "Kansas City Royals": "KC", "Los Angeles Angels": "LAA", "Los Angeles Dodgers": "LAD", "Miami Marlins": "MIA", "Milwaukee Brewers": "MIL", "Minnesota Twins": "MIN", "New York Mets": "NYM", "New York Yankees": "NYY", "Oakland Athletics": "OAK", "Philadelphia Phillies": "PHI", "Pittsburgh Pirates": "PIT", "San Diego Padres": "SD", "San Francisco Giants": "SF", "Seattle Mariners": "SEA", "St. Louis Cardinals": "STL", "Tampa Bay Rays": "TB", "Texas Rangers": "TEX", "Toronto Blue Jays": "TOR", "Washington Nationals": "WSH", "Diamondbacks": "ARI", "D-backs": "ARI", "Braves": "ATL", "Orioles": "BAL", "Red Sox": "BOS", "Cubs": "CHC", "White Sox": "CHW", "Reds": "CIN", "Guardians": "CLE", "Indians": "CLE", "Rockies": "COL", "Angels": "LAA", "Dodgers": "LAD", "Marlins": "MIA", "Brewers": "MIL", "Twins": "MIN", "Mets": "NYM", "Yankees": "NYY", "Athletics": "OAK", "Phillies": "PHI", "Pirates": "PIT", "Padres": "SD", "Giants": "SF", "Mariners": "SEA", "Cardinals": "STL", "Rays": "TB", "Rangers": "TEX", "Blue Jays": "TOR", "Nationals": "WSH", "ARZ": "ARI", "AZ": "ARI", "CWS": "CHW", "NY Mets": "NYM", "WSH Nationals": "WSH", "METS": "NYM", "YANKEES": "NYY", "ATH": "OAK" }
+MLB_TEAM_NAME_MAP = {
+    "ARI": "ARI", "ATL": "ATL", "BAL": "BAL", "BOS": "BOS", "CHC": "CHC", "CHW": "CHW", "CIN": "CIN", "CLE": "CLE",
+    "COL": "COL", "DET": "DET", "HOU": "HOU", "KCR": "KC", "KC": "KC", "LAA": "LAA", "LAD": "LAD", "MIA": "MIA",
+    "MIL": "MIL", "MIN": "MIN", "NYM": "NYM", "NYY": "NYY", "OAK": "OAK", "PHI": "PHI", "PIT": "PIT", "SDP": "SD",
+    "SD": "SD", "SFG": "SF", "SF": "SF", "SEA": "SEA", "STL": "STL", "TBR": "TB", "TB": "TB", "TEX": "TEX",
+    "TOR": "TOR", "WSN": "WSH", "WAS": "WSH", 
+    "Arizona Diamondbacks": "ARI", "Atlanta Braves": "ATL", "Baltimore Orioles": "BAL", "Boston Red Sox": "BOS",
+    "Chicago Cubs": "CHC", "Chicago White Sox": "CHW", "Cincinnati Reds": "CIN", "Cleveland Guardians": "CLE",
+    "Colorado Rockies": "COL", "Detroit Tigers": "DET", "Houston Astros": "HOU", "Kansas City Royals": "KC",
+    "Los Angeles Angels": "LAA", "Los Angeles Dodgers": "LAD", "Miami Marlins": "MIA", "Milwaukee Brewers": "MIL",
+    "Minnesota Twins": "MIN", "New York Mets": "NYM", "New York Yankees": "NYY", "Oakland Athletics": "OAK",
+    "Philadelphia Phillies": "PHI", "Pittsburgh Pirates": "PIT", "San Diego Padres": "SD", "San Francisco Giants": "SF",
+    "Seattle Mariners": "SEA", "St. Louis Cardinals": "STL", "Tampa Bay Rays": "TB", "Texas Rangers": "TEX",
+    "Toronto Blue Jays": "TOR", "Washington Nationals": "WSH", 
+    "Diamondbacks": "ARI", "D-backs": "ARI", "Braves": "ATL", "Orioles": "BAL", "Red Sox": "BOS", "Cubs": "CHC",
+    "White Sox": "CHW", "Reds": "CIN", "Guardians": "CLE", "Indians": "CLE", "Rockies": "COL", "Angels": "LAA",
+    "Dodgers": "LAD", "Marlins": "MIA", "Brewers": "MIL", "Twins": "MIN", "Mets": "NYM", "Yankees": "NYY",
+    "Athletics": "OAK", "Phillies": "PHI", "Pirates": "PIT", "Padres": "SD", "Giants": "SF", "Mariners": "SEA",
+    "Cardinals": "STL", "Rays": "TB", "Rangers": "TEX", "Blue Jays": "TOR", "Nationals": "WSH", "ARZ": "ARI",
+    "AZ": "ARI", "CWS": "CHW", "NY Mets": "NYM", "WSH Nationals": "WSH", "METS": "NYM", "YANKEES": "NYY", "ATH": "OAK"
+}
 
 # Maps MLB team abbreviations to city and state for weather lookup
 CITY_MAP = { "ARI": "Phoenix,AZ", "ATL": "Atlanta,GA", "BAL": "Baltimore,MD", "BOS": "Boston,MA", "CHC": "Chicago,IL", "CHW": "Chicago,IL", "CIN": "Cincinnati,OH", "CLE": "Cleveland,OH", "COL": "Denver,CO", "DET": "Detroit,MI", "HOU": "Houston,TX", "KC": "Kansas City,MO", "LAA": "Anaheim,CA", "LAD": "Los Angeles,CA", "MIA": "Miami,FL", "MIL": "Milwaukee,WI", "MIN": "Minneapolis,MN", "NYM": "Queens,NY", "NYY": "Bronx,NY", "OAK": "Oakland,CA", "PHI": "Philadelphia,PA", "PIT": "Pittsburgh,PA", "SD": "San Diego,CA", "SF": "San Francisco,CA", "SEA": "Seattle,WA", "STL": "St. Louis,MO", "TB": "St. Petersburg,FL", "TEX": "Arlington,TX", "TOR": "Toronto,ON", "WSH": "Washington,DC" }
 
 # NFL Team mapping to handle variations from different APIs and feature files
 NFL_TEAM_NAME_MAP = {
-    "Arizona Cardinals": "Arizona Cardinals", "Atlanta Falcons": "Atlanta Falcons", "Baltimore Ravens": "Baltimore Ravens", 
-    "Buffalo Bills": "Buffalo Bills", "Carolina Panthers": "Carolina Panthers", "Chicago Bears": "Chicago Bears",
-    "Cincinnati Bengals": "Cincinnati Bengals", "Cleveland Browns": "Cleveland Browns", "Dallas Cowboys": "Dallas Cowboys", 
-    "Denver Broncos": "Denver Broncos", "Detroit Lions": "Detroit Lions", "Green Bay Packers": "Green Bay Packers", 
-    "Houston Texans": "Houston Texans", "Indianapolis Colts": "Indianapolis Colts", "Jacksonville Jaguars": "Jacksonville Jaguars", 
-    "Kansas City Chiefs": "Kansas City Chiefs", "Las Vegas Raiders": "Las Vegas Raiders", "Los Angeles Chargers": "Los Angeles Chargers",
-    "Los Angeles Rams": "Los Angeles Rams", "Miami Dolphins": "Miami Dolphins", "Minnesota Vikings": "Minnesota Vikings", 
-    "New England Patriots": "New England Patriots", "New Orleans Saints": "New Orleans Saints", "New York Giants": "New York Giants",
-    "New York Jets": "New York Jets", "Philadelphia Eagles": "Philadelphia Eagles", "Pittsburgh Steelers": "Pittsburgh Steelers",
-    "San Francisco 49ers": "San Francisco 49ers", "Seattle Seahawks": "Seattle Seahawks", "Tampa Bay Buccaneers": "Tampa Bay Buccaneers",
-    "Tennessee Titans": "Tennessee Titans", "Washington Commanders": "Washington Commanders",
-    # Mappings for common abbreviations and alternative spellings
-    "ARI": "Arizona Cardinals", "ATL": "Atlanta Falcons", "BAL": "Baltimore Ravens", "BUF": "Buffalo Bills",
-    "CAR": "Carolina Panthers", "CHI": "Chicago Bears", "CIN": "Cincinnati Bengals", "CLE": "Cleveland Browns",
-    "DAL": "Dallas Cowboys", "DEN": "Denver Broncos", "DET": "Detroit Lions", "GB": "Green Bay Packers",
-    "HOU": "Houston Texans", "IND": "Indianapolis Colts", "JAX": "Jacksonville Jaguars", "KC": "Kansas City Chiefs",
-    "LV": "Las Vegas Raiders", "LAC": "Los Angeles Chargers", "LA": "Los Angeles Rams", "MIA": "Miami Dolphins",
-    "MIN": "Minnesota Vikings", "NE": "New England Patriots", "NO": "New Orleans Saints", "NYG": "New York Giants",
-    "NYJ": "New York Jets", "PHI": "Philadelphia Eagles", "PIT": "Pittsburgh Steelers", "SF": "San Francisco 49ers",
-    "SEA": "Seattle Seahawks", "TB": "Tampa Bay Buccaneers", "TEN": "Tennessee Titans", "WSH": "Washington Commanders"
+    # Full names from Odds API mapped to a simplified format (city name)
+    "Arizona Cardinals": "Arizona", "Atlanta Falcons": "Atlanta", "Baltimore Ravens": "Baltimore", 
+    "Buffalo Bills": "Buffalo", "Carolina Panthers": "Carolina", "Chicago Bears": "Chicago",
+    "Cincinnati Bengals": "Cincinnati", "Cleveland Browns": "Cleveland", "Dallas Cowboys": "Dallas", 
+    "Denver Broncos": "Denver", "Detroit Lions": "Detroit", "Green Bay Packers": "Green Bay", 
+    "Houston Texans": "Houston", "Indianapolis Colts": "Indianapolis", "Jacksonville Jaguars": "Jacksonville", 
+    "Kansas City Chiefs": "Kansas City", "Las Vegas Raiders": "Las Vegas", "Los Angeles Chargers": "Los Angeles",
+    "Los Angeles Rams": "Los Angeles", "Miami Dolphins": "Miami", "Minnesota Vikings": "Minnesota", 
+    "New England Patriots": "New England", "New Orleans Saints": "New Orleans", "New York Giants": "New York",
+    "New York Jets": "New York", "Philadelphia Eagles": "Philadelphia", "Pittsburgh Steelers": "Pittsburgh",
+    "San Francisco 49ers": "San Francisco", "Seattle Seahawks": "Seattle", "Tampa Bay Buccaneers": "Tampa Bay",
+    "Tennessee Titans": "Tennessee", "Washington Commanders": "Washington",
+    # Mappings for common abbreviations
+    "ARI": "Arizona", "ATL": "Atlanta", "BAL": "Baltimore", "BUF": "Buffalo", "CAR": "Carolina", "CHI": "Chicago",
+    "CIN": "Cincinnati", "CLE": "Cleveland", "DAL": "Dallas", "DEN": "Denver", "DET": "Detroit", "GB": "Green Bay",
+    "HOU": "Houston", "IND": "Indianapolis", "JAX": "Jacksonville", "KC": "Kansas City", "LV": "Las Vegas",
+    "LAC": "Los Angeles", "LA": "Los Angeles", "MIA": "Miami", "MIN": "Minnesota", "NE": "New England",
+    "NO": "New Orleans", "NYG": "New York", "NYJ": "New York", "PHI": "Philadelphia", "PIT": "Pittsburgh",
+    "SF": "San Francisco", "SEA": "Seattle", "TB": "Tampa Bay", "TEN": "Tennessee", "WSH": "Washington"
 }
-
 
 def get_weather_for_game(city):
     """
@@ -181,16 +199,20 @@ def predict(sport):
         if nfl_model is None or nfl_features_df is None:
             return jsonify({'error': 'NFL model or features not loaded.'}), 503
 
-        # Map full team names to standard full names to match the features file
-        home_team_standard = NFL_TEAM_NAME_MAP.get(home_team_full, home_team_full)
-        away_team_standard = NFL_TEAM_NAME_MAP.get(away_team_full, away_team_full)
+        # Map full team names to a simplified name format
+        home_team_standard = NFL_TEAM_NAME_MAP.get(home_team_full)
+        away_team_standard = NFL_TEAM_NAME_MAP.get(away_team_full)
 
-        # Retrieve features for each NFL team
+        # Check if the mapping was successful
+        if not home_team_standard or not away_team_standard:
+            return jsonify({'error': f'Team name mapping failed. Could not find a standard name for {home_team_full} or {away_team_full}.'}), 404
+        
+        # Retrieve features for each NFL team using the standardized name
         home_feats_row = nfl_features_df[nfl_features_df['team'] == home_team_standard]
         away_feats_row = nfl_features_df[nfl_features_df['team'] == away_team_standard]
         
         if home_feats_row.empty or away_feats_row.empty:
-            return jsonify({'error': f'No NFL features found for {home_team_full} or {away_team_full}. Check team names.'}), 404
+            return jsonify({'error': f'No NFL features found for {home_team_full} or {away_team_full} in the loaded features file. The file may be out of date or the team names are not available.'}), 404
         
         home_feats = home_feats_row.iloc[0].to_dict()
         away_feats = away_feats_row.iloc[0].to_dict()
