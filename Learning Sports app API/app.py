@@ -45,7 +45,7 @@ MLB_TEAM_NAME_MAP = { "ARI": "ARI", "ATL": "ATL", "BAL": "BAL", "BOS": "BOS", "C
 # Maps MLB team abbreviations to city and state for weather lookup
 CITY_MAP = { "ARI": "Phoenix,AZ", "ATL": "Atlanta,GA", "BAL": "Baltimore,MD", "BOS": "Boston,MA", "CHC": "Chicago,IL", "CHW": "Chicago,IL", "CIN": "Cincinnati,OH", "CLE": "Cleveland,OH", "COL": "Denver,CO", "DET": "Detroit,MI", "HOU": "Houston,TX", "KC": "Kansas City,MO", "LAA": "Anaheim,CA", "LAD": "Los Angeles,CA", "MIA": "Miami,FL", "MIL": "Milwaukee,WI", "MIN": "Minneapolis,MN", "NYM": "Queens,NY", "NYY": "Bronx,NY", "OAK": "Oakland,CA", "PHI": "Philadelphia,PA", "PIT": "Pittsburgh,PA", "SD": "San Diego,CA", "SF": "San Francisco,CA", "SEA": "Seattle,WA", "STL": "St. Louis,MO", "TB": "St. Petersburg,FL", "TEX": "Arlington,TX", "TOR": "Toronto,ON", "WSH": "Washington,DC" }
 
-# NFL Team mapping to handle variations from different APIs
+# NFL Team mapping to handle variations from different APIs and feature files
 NFL_TEAM_NAME_MAP = {
     "Arizona Cardinals": "Arizona Cardinals", "Atlanta Falcons": "Atlanta Falcons", "Baltimore Ravens": "Baltimore Ravens", 
     "Buffalo Bills": "Buffalo Bills", "Carolina Panthers": "Carolina Panthers", "Chicago Bears": "Chicago Bears",
@@ -58,7 +58,7 @@ NFL_TEAM_NAME_MAP = {
     "New York Jets": "New York Jets", "Philadelphia Eagles": "Philadelphia Eagles", "Pittsburgh Steelers": "Pittsburgh Steelers",
     "San Francisco 49ers": "San Francisco 49ers", "Seattle Seahawks": "Seattle Seahawks", "Tampa Bay Buccaneers": "Tampa Bay Buccaneers",
     "Tennessee Titans": "Tennessee Titans", "Washington Commanders": "Washington Commanders",
-    # Mappings for common abbreviations
+    # Mappings for common abbreviations and alternative spellings
     "ARI": "Arizona Cardinals", "ATL": "Atlanta Falcons", "BAL": "Baltimore Ravens", "BUF": "Buffalo Bills",
     "CAR": "Carolina Panthers", "CHI": "Chicago Bears", "CIN": "Cincinnati Bengals", "CLE": "Cleveland Browns",
     "DAL": "Dallas Cowboys", "DEN": "Denver Broncos", "DET": "Detroit Lions", "GB": "Green Bay Packers",
