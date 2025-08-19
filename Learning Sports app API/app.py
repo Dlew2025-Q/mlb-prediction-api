@@ -27,28 +27,10 @@ nfl_model = load_pickle('nfl_total_points_model.pkl')
 mlb_features_df = load_pickle('latest_features.pkl') 
 nfl_features_df = load_pickle('latest_nfl_features.pkl')
 
-
 # --- CONFIGURATION ---
 ODDS_API_KEY = os.environ.get('ODDS_API_KEY')
 WEATHER_API_KEY = os.environ.get('WEATHER_API_KEY')
-
 MLB_TEAM_NAME_MAP = { "ARI": "ARI", "ATL": "ATL", "BAL": "BAL", "BOS": "BOS", "CHC": "CHC", "CHW": "CHW", "CIN": "CIN", "CLE": "CLE", "COL": "COL", "DET": "DET", "HOU": "HOU", "KCR": "KC", "KC": "KC", "LAA": "LAA", "LAD": "LAD", "MIA": "MIA", "MIL": "MIL", "MIN": "MIN", "NYM": "NYM", "NYY": "NYY", "OAK": "OAK", "PHI": "PHI", "PIT": "PIT", "SDP": "SD", "SD": "SD", "SFG": "SF", "SF": "SF", "SEA": "SEA", "STL": "STL", "TBR": "TB", "TB": "TB", "TEX": "TEX", "TOR": "TOR", "WSN": "WSH", "WAS": "WSH", "Arizona Diamondbacks": "ARI", "Atlanta Braves": "ATL", "Baltimore Orioles": "BAL", "Boston Red Sox": "BOS", "Chicago Cubs": "CHC", "Chicago White Sox": "CHW", "Cincinnati Reds": "CIN", "Cleveland Guardians": "CLE", "Colorado Rockies": "COL", "Detroit Tigers": "DET", "Houston Astros": "HOU", "Kansas City Royals": "KC", "Los Angeles Angels": "LAA", "Los Angeles Dodgers": "LAD", "Miami Marlins": "MIA", "Milwaukee Brewers": "MIL", "Minnesota Twins": "MIN", "New York Mets": "NYM", "New York Yankees": "NYY", "Oakland Athletics": "OAK", "Philadelphia Phillies": "PHI", "Pittsburgh Pirates": "PIT", "San Diego Padres": "SD", "San Francisco Giants": "SF", "Seattle Mariners": "SEA", "St. Louis Cardinals": "STL", "Tampa Bay Rays": "TB", "Texas Rangers": "TEX", "Toronto Blue Jays": "TOR", "Washington Nationals": "WSH", "Diamondbacks": "ARI", "D-backs": "ARI", "Braves": "ATL", "Orioles": "BAL", "Red Sox": "BOS", "Cubs": "CHC", "White Sox": "CHW", "Reds": "CIN", "Guardians": "CLE", "Indians": "CLE", "Rockies": "COL", "Angels": "LAA", "Dodgers": "LAD", "Marlins": "MIA", "Brewers": "MIL", "Twins": "MIN", "Mets": "NYM", "Yankees": "NYY", "Athletics": "OAK", "Phillies": "PHI", "Pirates": "PIT", "Padres": "SD", "Giants": "SF", "Mariners": "SEA", "Cardinals": "STL", "Rays": "TB", "Rangers": "TEX", "Blue Jays": "TOR", "Nationals": "WSH", "ARZ": "ARI", "AZ": "ARI", "CWS": "CHW", "NY Mets": "NYM", "WSH Nationals": "WSH", "METS": "NYM", "YANKEES": "NYY", "ATH": "OAK" }
-
-# --- NEW: Added a name map for NFL teams ---
-NFL_TEAM_NAME_MAP = {
-    "Arizona Cardinals": "Arizona Cardinals", "Atlanta Falcons": "Atlanta Falcons", "Baltimore Ravens": "Baltimore Ravens",
-    "Buffalo Bills": "Buffalo Bills", "Carolina Panthers": "Carolina Panthers", "Chicago Bears": "Chicago Bears",
-    "Cincinnati Bengals": "Cincinnati Bengals", "Cleveland Browns": "Cleveland Browns", "Dallas Cowboys": "Dallas Cowboys",
-    "Denver Broncos": "Denver Broncos", "Detroit Lions": "Detroit Lions", "Green Bay Packers": "Green Bay Packers",
-    "Houston Texans": "Houston Texans", "Indianapolis Colts": "Indianapolis Colts", "Jacksonville Jaguars": "Jacksonville Jaguars",
-    "Kansas City Chiefs": "Kansas City Chiefs", "Las Vegas Raiders": "Las Vegas Raiders", "Los Angeles Chargers": "Los Angeles Chargers",
-    "Los Angeles Rams": "Los Angeles Rams", "Miami Dolphins": "Miami Dolphins", "Minnesota Vikings": "Minnesota Vikings",
-    "New England Patriots": "New England Patriots", "New Orleans Saints": "New Orleans Saints", "New York Giants": "New York Giants",
-    "New York Jets": "New York Jets", "Philadelphia Eagles": "Philadelphia Eagles", "Pittsburgh Steelers": "Pittsburgh Steelers",
-    "San Francisco 49ers": "San Francisco 49ers", "Seattle Seahawks": "Seattle Seahawks", "Tampa Bay Buccaneers": "Tampa Bay Buccaneers",
-    "Tennessee Titans": "Tennessee Titans", "Washington Commanders": "Washington Commanders",
-}
-
 CITY_MAP = { "ARI": "Phoenix,AZ", "ATL": "Atlanta,GA", "BAL": "Baltimore,MD", "BOS": "Boston,MA", "CHC": "Chicago,IL", "CHW": "Chicago,IL", "CIN": "Cincinnati,OH", "CLE": "Cleveland,OH", "COL": "Denver,CO", "DET": "Detroit,MI", "HOU": "Houston,TX", "KC": "Kansas City,MO", "LAA": "Anaheim,CA", "LAD": "Los Angeles,CA", "MIA": "Miami,FL", "MIL": "Milwaukee,WI", "MIN": "Minneapolis,MN", "NYM": "Queens,NY", "NYY": "Bronx,NY", "OAK": "Oakland,CA", "PHI": "Philadelphia,PA", "PIT": "Pittsburgh,PA", "SD": "San Diego,CA", "SF": "San Francisco,CA", "SEA": "Seattle,WA", "STL": "St. Louis,MO", "TB": "St. Petersburg,FL", "TEX": "Arlington,TX", "TOR": "Toronto,ON", "WSH": "Washington,DC" }
 
 def get_weather_for_game(city):
@@ -109,23 +91,33 @@ def predict(sport):
         away_feats = away_feats_row.iloc[0].to_dict()
         
         final_features = {
-            # (Insert your final, working MLB feature dictionary here)
+            'rolling_avg_adj_hits_home_perf': float(home_feats.get('rolling_avg_adj_hits_home_perf', 8.0)),
+            'rolling_avg_adj_homers_home_perf': float(home_feats.get('rolling_avg_adj_homers_home_perf', 1.0)),
+            'rolling_avg_adj_walks_home_perf': float(home_feats.get('rolling_avg_adj_walks_home_perf', 3.0)),
+            'rolling_avg_adj_strikeouts_home_perf': float(home_feats.get('rolling_avg_adj_strikeouts_home_perf', 8.0)),
+            'rolling_avg_adj_hits_away_perf': float(away_feats.get('rolling_avg_adj_hits_away_perf', 8.0)),
+            'rolling_avg_adj_homers_away_perf': float(away_feats.get('rolling_avg_adj_homers_away_perf', 1.0)),
+            'rolling_avg_adj_walks_away_perf': float(away_feats.get('rolling_avg_adj_walks_away_perf', 3.0)),
+            'rolling_avg_adj_strikeouts_away_perf': float(away_feats.get('rolling_avg_adj_strikeouts_away_perf', 8.0)),
+            'starter_rolling_adj_era_home': float(home_feats.get('starter_rolling_adj_era', 4.5)),
+            'starter_rolling_adj_era_away': float(away_feats.get('starter_rolling_adj_era', 4.5)),
+            'park_factor': float(home_feats.get('park_factor', 9.0)),
+            'bullpen_ip_last_3_days_home': float(home_feats.get('bullpen_ip_last_3_days', 0.0)),
+            'bullpen_ip_last_3_days_away': float(away_feats.get('bullpen_ip_last_3_days', 0.0)),
+            'temperature': weather['temperature'],
+            'wind_speed': weather['wind_speed'],
+            'humidity': weather['humidity'],
         }
         
     elif sport == "nfl":
         if nfl_model is None or nfl_features_df is None:
             return jsonify({'error': 'NFL model or features not loaded.'}), 503
 
-        # --- FIX: Use the new NFL_TEAM_NAME_MAP to standardize team names ---
-        home_team_standard = NFL_TEAM_NAME_MAP.get(home_team_full, home_team_full)
-        away_team_standard = NFL_TEAM_NAME_MAP.get(away_team_full, away_team_full)
-
-        home_feats_row = nfl_features_df[nfl_features_df['team'] == home_team_standard]
-        away_feats_row = nfl_features_df[nfl_features_df['team'] == away_team_standard]
+        home_feats_row = nfl_features_df[nfl_features_df['team'] == home_team_full]
+        away_feats_row = nfl_features_df[nfl_features_df['team'] == away_team_full]
         
         if home_feats_row.empty or away_feats_row.empty:
-            missing_team = home_team_standard if home_feats_row.empty else away_team_standard
-            return jsonify({'error': f'No NFL features found for team: {missing_team}'}), 404
+            return jsonify({'error': f'No NFL features found for a team'}), 404
         
         home_feats = home_feats_row.iloc[0].to_dict()
         away_feats = away_feats_row.iloc[0].to_dict()
