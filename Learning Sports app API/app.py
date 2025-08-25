@@ -33,6 +33,8 @@ mlb_model = load_pickle('mlb_total_runs_model.pkl')
 nfl_model = load_pickle('nfl_total_points_model.pkl')
 mlb_features_df = load_pickle('latest_features.pkl') 
 nfl_features_df = load_pickle('latest_nfl_features.pkl')
+mlb_calibration_model = load_pickle('mlb_calibration_model.pkl')
+nfl_calibration_model = load_pickle('nfl_calibration_model.pkl')
 
 # --- CONFIGURATION ---
 # Get API keys from environment variables for security
@@ -59,7 +61,6 @@ MLB_TEAM_NAME_MAP = {
     "Cardinals": "St. Louis Cardinals", "Rays": "Tampa Bay Rays", "Rangers": "Texas Rangers", "Blue Jays": "Toronto Blue Jays", "Nationals": "Washington Nationals",
     "ARZ": "Arizona Diamondbacks", "AZ": "Arizona Diamondbacks", "CWS": "Chicago White Sox", "METS": "New York Mets", "YANKEES": "New York Yankees", "ATH": "Oakland Athletics"
 }
-
 
 # Maps MLB team abbreviations to city and state for weather lookup
 CITY_MAP = { "ARI": "Phoenix,AZ", "ATL": "Atlanta,GA", "BAL": "Baltimore,MD", "BOS": "Boston,MA", "CHC": "Chicago,IL", "CHW": "Chicago,IL", "CIN": "Cincinnati,OH", "CLE": "Cleveland,OH", "COL": "Denver,CO", "DET": "Detroit,MI", "HOU": "Houston,TX", "KC": "Kansas City,MO", "LAA": "Anaheim,CA", "LAD": "Los Angeles,CA", "MIA": "Miami,FL", "MIL": "Milwaukee,WI", "MIN": "Minneapolis,MN", "NYM": "Queens,NY", "NYY": "Bronx,NY", "OAK": "Oakland,CA", "PHI": "Philadelphia,PA", "PIT": "Pittsburgh,PA", "SD": "San Diego,CA", "SF": "San Francisco,CA", "SEA": "Seattle,WA", "STL": "St. Louis,MO", "TB": "St. Petersburg,FL", "TEX": "Arlington,TX", "TOR": "Toronto,ON", "WSH": "Washington,DC" }
@@ -137,7 +138,6 @@ def predict(sport):
             return jsonify({'error': 'MLB model or features not loaded.'}), 503
         
         # Map full team names to full names and get weather data.
-        # This fixes the issue with the precompute script now using full names.
         home_team_standard = MLB_TEAM_NAME_MAP.get(home_team_full, home_team_full)
         away_team_standard = MLB_TEAM_NAME_MAP.get(away_team_full, away_team_full)
         
