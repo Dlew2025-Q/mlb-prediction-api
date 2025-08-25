@@ -8,3 +8,4 @@ requests
 fuzzywuzzy
 python-Levenshtein
 gunicorn
+flask
