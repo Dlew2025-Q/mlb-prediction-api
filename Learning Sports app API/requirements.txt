@@ -1,8 +1,9 @@
-flask
-gunicorn
 pandas
+sqlalchemy
+psycopg2-binary
 scikit-learn
 xgboost
-Flask-Cors
 python-dotenv
 requests
+fuzzywuzzy
+python-Levenshtein
