@@ -5,8 +5,7 @@ scikit-learn
 xgboost
 python-dotenv
 requests
-fuzzywuzzy
-python-Levenshtein
 gunicorn
 flask
 flask-cors
+
