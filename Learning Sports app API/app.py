@@ -33,8 +33,6 @@ mlb_model = load_pickle('mlb_total_runs_model.pkl')
 nfl_model = load_pickle('nfl_total_points_model.pkl')
 mlb_features_df = load_pickle('latest_features.pkl') 
 nfl_features_df = load_pickle('latest_nfl_features.pkl')
-mlb_calibration_model = load_pickle('mlb_calibration_model.pkl')
-nfl_calibration_model = load_pickle('nfl_calibration_model.pkl')
 
 # --- CONFIGURATION ---
 # Get API keys from environment variables for security
@@ -137,16 +135,13 @@ def predict(sport):
         if mlb_model is None or mlb_features_df is None:
             return jsonify({'error': 'MLB model or features not loaded.'}), 503
         
-        # Map full team names to full names and get weather data.
         home_team_standard = MLB_TEAM_NAME_MAP.get(home_team_full, home_team_full)
         away_team_standard = MLB_TEAM_NAME_MAP.get(away_team_full, away_team_full)
         
-        # Get city for weather lookup using the standardized abbreviation from the map
-        home_abbr = next((abbr for abbr, full_name in MLB_TEAM_NAME_MAP.items() if full_name == home_team_standard), home_team_full)
+        home_abbr = next((abbr for abbr, full_name in MLB_TEAM_NAME_MAP.items() if full_name == home_team_standard and len(abbr) <= 4), home_team_full)
         home_city = CITY_MAP.get(home_abbr)
         weather = get_weather_for_game(home_city)
 
-        # Retrieve features for each team from the pre-loaded dataframes
         home_feats_row = mlb_features_df[mlb_features_df['team'] == home_team_standard]
         away_feats_row = mlb_features_df[mlb_features_df['team'] == away_team_standard]
 
@@ -156,7 +151,6 @@ def predict(sport):
         home_feats = home_feats_row.iloc[0].to_dict()
         away_feats = away_feats_row.iloc[0].to_dict()
         
-        # Construct the final feature set for the prediction model
         final_features = {
             'rolling_avg_adj_hits_home_perf': float(home_feats.get('rolling_avg_adj_hits_home_perf', 8.0)),
             'rolling_avg_adj_homers_home_perf': float(home_feats.get('rolling_avg_adj_homers_home_perf', 1.0)),
@@ -180,11 +174,9 @@ def predict(sport):
         if nfl_model is None or nfl_features_df is None:
             return jsonify({'error': 'NFL model or features not loaded.'}), 503
         
-        # Use the team names directly from the API since precompute_features.py uses full names
         home_team_standard = home_team_full
         away_team_standard = away_team_full
 
-        # Retrieve features for each NFL team using the standardized name
         home_feats_row = nfl_features_df[nfl_features_df['team'] == home_team_standard]
         away_feats_row = nfl_features_df[nfl_features_df['team'] == away_team_standard]
         
@@ -194,7 +186,6 @@ def predict(sport):
         home_feats = home_feats_row.iloc[0].to_dict()
         away_feats = away_feats_row.iloc[0].to_dict()
 
-        # Construct the final feature set for the NFL prediction model
         final_features = {
             'rolling_avg_adj_pts_scored_home': float(home_feats.get('rolling_avg_adj_pts_scored_home', 21.0)),
             'rolling_avg_adj_pts_allowed_home': float(home_feats.get('rolling_avg_adj_pts_allowed_home', 21.0)),
@@ -206,21 +197,16 @@ def predict(sport):
         return jsonify({'error': 'Invalid sport specified. Must be "mlb" or "nfl".'}), 400
 
     try:
-        # Select the correct model based on the sport
         model = mlb_model if sport == 'mlb' else nfl_model
         
-        # Prepare the data for prediction, ensuring the feature order matches the model
         prediction_df = pd.DataFrame([final_features])[model.get_booster().feature_names]
         
-        # Make the prediction
-        prediction = model.predict(prediction_df)
+        predicted_total = model.predict(prediction_df)
         
-        return jsonify({'predicted_total_runs': float(prediction[0])})
+        return jsonify({'predicted_total_runs': float(predicted_total[0])})
     except Exception as e:
-        # Catch any errors during the prediction process
         return jsonify({'error': f'Prediction error: {str(e)}'}), 500
 
 if __name__ == '__main__':
-    # Start the Flask development server
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
