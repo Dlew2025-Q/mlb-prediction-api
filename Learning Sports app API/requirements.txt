@@ -8,4 +8,5 @@ requests
 gunicorn
 flask
 flask-cors
+pybaseball
 
