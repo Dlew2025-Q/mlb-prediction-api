@@ -118,7 +118,6 @@ CITY_MAP = {
     "Tampa Bay Rays": "St. Petersburg,FL", "Texas Rangers": "Arlington,TX", "Toronto Blue Jays": "Toronto,ON", "Washington Nationals": "Washington,DC"
 }
 
-# FIX: Added CITY_TIMEZONE_MAP back to dynamically calculate travel_factor
 CITY_TIMEZONE_MAP = {
     "Arizona Diamondbacks": "America/Phoenix", "Atlanta Braves": "America/New_York", "Baltimore Orioles": "America/New_York", "Boston Red Sox": "America/New_York",
     "Chicago Cubs": "America/Chicago", "Chicago White Sox": "America/Chicago", "Cincinnati Reds": "America/New_York", "Cleveland Guardians": "America/New_York",
@@ -221,11 +220,9 @@ def predict(sport):
         home_city = CITY_MAP.get(home_team_standard)
         weather = get_weather_for_game(home_city)
         
-        # FIX: Dynamically calculate game_of_season for the new game
         current_season_games = home_team_all_games[home_team_all_games['commence_time'].dt.year == commence_time.year]
         game_of_season = len(current_season_games) + 1
 
-        # FIX: Dynamically calculate travel_factor for the away team
         def get_tz_offset(team_name):
             tz_name = CITY_TIMEZONE_MAP.get(team_name)
             if not tz_name: return 0
@@ -234,25 +231,25 @@ def predict(sport):
             except pytz.UnknownTimeZoneError:
                 return 0
         
-        # Determine the away team's previous location
         prev_game_loc_team = away_team_last_game['home_team'] if away_team_last_game['away_team'] == away_team_standard else away_team_last_game['away_team']
         
         prev_tz_offset = get_tz_offset(prev_game_loc_team)
         current_tz_offset = get_tz_offset(home_team_standard)
         travel_factor = abs(current_tz_offset - prev_tz_offset)
 
+        # FIX: Updated feature dictionary to use the new, more stable rolling average features.
         final_features = {
-            'in_series_hits_lag_home': home_feats.get('in_series_hits_lag_home', 8.0),
-            'in_series_homers_lag_home': home_feats.get('in_series_homers_lag_home', 1.0),
-            'in_series_walks_lag_home': home_feats.get('in_series_walks_lag_home', 3.0),
-            'in_series_strikeouts_lag_home': home_feats.get('in_series_strikeouts_lag_home', 8.0),
+            'rolling_avg_adj_hits_home': home_feats.get('rolling_avg_adj_hits_home', 8.0),
+            'rolling_avg_adj_homers_home': home_feats.get('rolling_avg_adj_homers_home', 1.0),
+            'rolling_avg_adj_walks_home': home_feats.get('rolling_avg_adj_walks_home', 3.0),
+            'rolling_avg_adj_strikeouts_home': home_feats.get('rolling_avg_adj_strikeouts_home', 8.0),
             'starter_rolling_adj_era_home': home_feats.get('starter_rolling_adj_era_home', 4.5),
             'park_factor': home_feats.get('park_factor', 9.0),
             'bullpen_ip_last_3_days_home': home_feats.get('bullpen_ip_last_3_days_home', 0.0),
-            'in_series_hits_lag_away': away_feats.get('in_series_hits_lag_away', 8.0),
-            'in_series_homers_lag_away': away_feats.get('in_series_homers_lag_away', 1.0),
-            'in_series_walks_lag_away': away_feats.get('in_series_walks_lag_away', 3.0),
-            'in_series_strikeouts_lag_away': away_feats.get('in_series_strikeouts_lag_away', 8.0),
+            'rolling_avg_adj_hits_away': away_feats.get('rolling_avg_adj_hits_away', 8.0),
+            'rolling_avg_adj_homers_away': away_feats.get('rolling_avg_adj_homers_away', 1.0),
+            'rolling_avg_adj_walks_away': away_feats.get('rolling_avg_adj_walks_away', 3.0),
+            'rolling_avg_adj_strikeouts_away': away_feats.get('rolling_avg_adj_strikeouts_away', 8.0),
             'starter_rolling_adj_era_away': away_feats.get('starter_rolling_adj_era_away', 4.5),
             'bullpen_ip_last_3_days_away': away_feats.get('bullpen_ip_last_3_days_away', 0.0),
             'temperature': weather['temperature'],
@@ -264,7 +261,6 @@ def predict(sport):
             'travel_factor': travel_factor
         }
     elif sport == "nfl":
-        # ... (NFL logic remains the same as it was likely correct)
         if nfl_model is None or nfl_calibration_model is None or nfl_features_df is None:
             return jsonify({'error': 'NFL model or features not loaded.'}), 503
 
@@ -315,7 +311,6 @@ def predict(sport):
         feature_order = model.get_booster().feature_names
         
         prediction_df = pd.DataFrame([final_features], columns=feature_order)
-        # Ensure all required columns are present, fill with 0 if not
         for col in feature_order:
             if col not in prediction_df.columns:
                 prediction_df[col] = 0.0
