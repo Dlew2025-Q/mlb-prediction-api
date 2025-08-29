@@ -38,9 +38,11 @@ def load_pickle(path):
 mlb_model = load_pickle('mlb_total_runs_model.pkl')
 mlb_calibration_model = load_pickle('mlb_calibration_model.pkl')
 mlb_features_df = load_pickle('latest_mlb_features.pkl')
+
 nfl_model = load_pickle('nfl_total_points_model.pkl')
 nfl_calibration_model = load_pickle('nfl_calibration_model.pkl')
 nfl_features_df = load_pickle('latest_nfl_features.pkl')
+
 
 # --- CONFIGURATION ---
 # Get API keys from environment variables for security
@@ -179,14 +181,14 @@ def predict(sport):
         away_feats_row = mlb_features_df[mlb_features_df['team'] == away_team_standard]
 
         if home_feats_row.empty or away_feats_row.empty:
-            return jsonify({'error': f'No MLB features found for {home_team_full} or {away_team_full} in the loaded features file.'}), 404
+            return jsonify({'error': f"No MLB features found for {home_team_full} or {away_team_full} in the loaded features file. Please run the pre-computation script to update features."}), 404
         
         home_feats = home_feats_row.iloc[0].to_dict()
         away_feats = away_feats_row.iloc[0].to_dict()
 
         home_city = CITY_MAP.get(home_team_standard)
         weather = get_weather_for_game(home_city)
-
+        
         # Get values from the loaded features dataframe with correct suffixes
         final_features = {
             'rolling_avg_adj_hits_home_perf_home': home_feats.get('rolling_avg_adj_hits_home_perf_home', 8.0),
@@ -231,6 +233,7 @@ def predict(sport):
         home_city = CITY_MAP.get(home_team_standard)
         weather = get_weather_for_game(home_city)
 
+        # Build the final feature dictionary with the correct column names from the pre-computed file
         final_features = {
             'rolling_avg_adj_pts_scored_home': home_feats.get('rolling_avg_adj_pts_scored_home', 21.0),
             'rolling_avg_adj_pts_allowed_home': home_feats.get('rolling_avg_adj_pts_allowed_home', 21.0),
@@ -254,14 +257,15 @@ def predict(sport):
         feature_order = model.get_booster().feature_names
         
         # Create a DataFrame with the same feature order the model was trained on
-        prediction_df = pd.DataFrame([final_features])[feature_order]
+        prediction_df = pd.DataFrame([final_features], columns=feature_order)
 
         # Make the prediction
         raw_prediction = model.predict(prediction_df)[0]
         
         # Use the calibration model to get a confidence score
         confidence_df = pd.DataFrame([{'raw_prediction': raw_prediction}])
-        confidence_score = calibration_model.predict_proba(confidence_df)[0][1]
+        # Reshape to 2D array if a 1D array is passed
+        confidence_score = calibration_model.predict_proba(confidence_df.values.reshape(-1, 1))[0][1]
 
         return jsonify({
             'predicted_total_runs': float(raw_prediction),
