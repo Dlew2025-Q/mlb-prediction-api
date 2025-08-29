@@ -43,8 +43,7 @@ nfl_model = load_pickle('nfl_total_points_model.pkl')
 nfl_calibration_model = load_pickle('nfl_calibration_model.pkl')
 nfl_features_df = load_pickle('latest_nfl_features.pkl')
 
-# FIX: Ensure data is sorted upon loading to guarantee `.iloc[-1]` gets the latest game.
-# This is the primary fix for the model returning uniform, incorrect predictions.
+# Ensure data is sorted upon loading to guarantee `.iloc[-1]` gets the latest game.
 if mlb_features_df is not None:
     mlb_features_df['commence_time'] = pd.to_datetime(mlb_features_df['commence_time'], utc=True)
     mlb_features_df.dropna(subset=['commence_time'], inplace=True)
@@ -119,6 +118,18 @@ CITY_MAP = {
     "Tampa Bay Rays": "St. Petersburg,FL", "Texas Rangers": "Arlington,TX", "Toronto Blue Jays": "Toronto,ON", "Washington Nationals": "Washington,DC"
 }
 
+# FIX: Added CITY_TIMEZONE_MAP back to dynamically calculate travel_factor
+CITY_TIMEZONE_MAP = {
+    "Arizona Diamondbacks": "America/Phoenix", "Atlanta Braves": "America/New_York", "Baltimore Orioles": "America/New_York", "Boston Red Sox": "America/New_York",
+    "Chicago Cubs": "America/Chicago", "Chicago White Sox": "America/Chicago", "Cincinnati Reds": "America/New_York", "Cleveland Guardians": "America/New_York",
+    "Colorado Rockies": "America/Denver", "Detroit Tigers": "America/New_York", "Houston Astros": "America/Chicago", "Kansas City Royals": "America/Chicago",
+    "Los Angeles Angels": "America/Los_Angeles", "Los Angeles Dodgers": "America/Los_Angeles", "Miami Marlins": "America/New_York", "Milwaukee Brewers": "America/Chicago",
+    "Minnesota Twins": "America/Chicago", "New York Mets": "America/New_York", "New York Yankees": "America/New_York", "Oakland Athletics": "America/Los_Angeles",
+    "Philadelphia Phillies": "America/New_York", "Pittsburgh Pirates": "America/New_York", "San Diego Padres": "America/Los_Angeles", "San Francisco Giants": "America/Los_Angeles",
+    "Seattle Mariners": "America/Los_Angeles", "St. Louis Cardinals": "America/Chicago", "Tampa Bay Rays": "America/New_York", "Texas Rangers": "America/Chicago",
+    "Toronto Blue Jays": "America/New_York", "Washington Nationals": "America/New_York"
+}
+
 def get_weather_for_game(city):
     """
     Fetches current weather conditions for a given city from the Visual Crossing API.
@@ -131,7 +142,7 @@ def get_weather_for_game(city):
     
     try:
         response = requests.get(url)
-        response.raise_for_status() # Raises an HTTPError for bad responses (4xx or 5xx)
+        response.raise_for_status()
         weather_data = response.json()
         current_conditions = weather_data.get('currentConditions', {})
         return {
@@ -140,7 +151,6 @@ def get_weather_for_game(city):
             'humidity': float(current_conditions.get('humidity', 50.0))
         }
     except requests.exceptions.RequestException:
-        # Return default values if the API call fails
         return {'temperature': 70.0, 'wind_speed': 5.0, 'humidity': 50.0}
 
 @app.route('/games/<sport>')
@@ -164,7 +174,6 @@ def get_games(sport):
         response.raise_for_status()
         games = response.json()
         
-        # Filter for upcoming games
         now_utc = datetime.now(timezone.utc)
         upcoming_games = [g for g in games if datetime.fromisoformat(g['commence_time'].replace('Z', '+00:00')) > now_utc]
         
@@ -174,10 +183,6 @@ def get_games(sport):
 
 @app.route('/predict/<sport>', methods=['POST'])
 def predict(sport):
-    """
-    API endpoint to make a total score prediction for a game based on a POST request.
-    It takes home and away team names and returns a predicted total and confidence score.
-    """
     sport = sport.lower()
     game_data = request.get_json()
     home_team_full = game_data.get('home_team')
@@ -197,30 +202,45 @@ def predict(sport):
         home_team_standard = MLB_TEAM_NAME_MAP.get(home_team_full, home_team_full)
         away_team_standard = MLB_TEAM_NAME_MAP.get(away_team_full, away_team_full)
 
-        # --- Get LATEST OVERALL game to calculate true rest days ---
-        home_team_last_game_df = mlb_features_df[(mlb_features_df['home_team'] == home_team_standard) | (mlb_features_df['away_team'] == home_team_standard)]
-        away_team_last_game_df = mlb_features_df[(mlb_features_df['home_team'] == away_team_standard) | (mlb_features_df['away_team'] == away_team_standard)]
+        home_team_all_games = mlb_features_df[(mlb_features_df['home_team'] == home_team_standard) | (mlb_features_df['away_team'] == home_team_standard)]
+        away_team_all_games = mlb_features_df[(mlb_features_df['home_team'] == away_team_standard) | (mlb_features_df['away_team'] == away_team_standard)]
+        home_team_latest_home_game = mlb_features_df[mlb_features_df['home_team'] == home_team_standard]
+        away_team_latest_away_game = mlb_features_df[mlb_features_df['away_team'] == away_team_standard]
 
-        # --- Get LATEST HOME/AWAY game for performance stats ---
-        home_team_latest_home_game_df = mlb_features_df[mlb_features_df['home_team'] == home_team_standard]
-        away_team_latest_away_game_df = mlb_features_df[mlb_features_df['away_team'] == away_team_standard]
-
-        if home_team_last_game_df.empty or away_team_last_game_df.empty or home_team_latest_home_game_df.empty or away_team_latest_away_game_df.empty:
+        if home_team_all_games.empty or away_team_all_games.empty or home_team_latest_home_game.empty or away_team_latest_away_game.empty:
             return jsonify({'error': f"Could not find sufficient historical game data for {home_team_full} or {away_team_full}."}), 404
 
-        # Get the last game record for each context
-        home_team_last_game = home_team_last_game_df.iloc[-1]
-        away_team_last_game = away_team_last_game_df.iloc[-1]
-        home_feats = home_team_latest_home_game_df.iloc[-1].to_dict()
-        away_feats = away_team_latest_away_game_df.iloc[-1].to_dict()
+        home_team_last_game = home_team_all_games.iloc[-1]
+        away_team_last_game = away_team_all_games.iloc[-1]
+        home_feats = home_team_latest_home_game.iloc[-1].to_dict()
+        away_feats = away_team_latest_away_game.iloc[-1].to_dict()
 
-        # Calculate days of rest until the upcoming game
         home_rest = (commence_time - home_team_last_game['commence_time']).days
         away_rest = (commence_time - away_team_last_game['commence_time']).days
 
         home_city = CITY_MAP.get(home_team_standard)
         weather = get_weather_for_game(home_city)
         
+        # FIX: Dynamically calculate game_of_season for the new game
+        current_season_games = home_team_all_games[home_team_all_games['commence_time'].dt.year == commence_time.year]
+        game_of_season = len(current_season_games) + 1
+
+        # FIX: Dynamically calculate travel_factor for the away team
+        def get_tz_offset(team_name):
+            tz_name = CITY_TIMEZONE_MAP.get(team_name)
+            if not tz_name: return 0
+            try:
+                return datetime(2023, 7, 1, tzinfo=pytz.timezone(tz_name)).utcoffset().total_seconds() / 3600
+            except pytz.UnknownTimeZoneError:
+                return 0
+        
+        # Determine the away team's previous location
+        prev_game_loc_team = away_team_last_game['home_team'] if away_team_last_game['away_team'] == away_team_standard else away_team_last_game['away_team']
+        
+        prev_tz_offset = get_tz_offset(prev_game_loc_team)
+        current_tz_offset = get_tz_offset(home_team_standard)
+        travel_factor = abs(current_tz_offset - prev_tz_offset)
+
         final_features = {
             'in_series_hits_lag_home': home_feats.get('in_series_hits_lag_home', 8.0),
             'in_series_homers_lag_home': home_feats.get('in_series_homers_lag_home', 1.0),
@@ -229,34 +249,30 @@ def predict(sport):
             'starter_rolling_adj_era_home': home_feats.get('starter_rolling_adj_era_home', 4.5),
             'park_factor': home_feats.get('park_factor', 9.0),
             'bullpen_ip_last_3_days_home': home_feats.get('bullpen_ip_last_3_days_home', 0.0),
-            
             'in_series_hits_lag_away': away_feats.get('in_series_hits_lag_away', 8.0),
             'in_series_homers_lag_away': away_feats.get('in_series_homers_lag_away', 1.0),
             'in_series_walks_lag_away': away_feats.get('in_series_walks_lag_away', 3.0),
             'in_series_strikeouts_lag_away': away_feats.get('in_series_strikeouts_lag_away', 8.0),
             'starter_rolling_adj_era_away': away_feats.get('starter_rolling_adj_era_away', 4.5),
             'bullpen_ip_last_3_days_away': away_feats.get('bullpen_ip_last_3_days_away', 0.0),
-            
             'temperature': weather['temperature'],
             'wind_speed': weather['wind_speed'],
             'humidity': weather['humidity'],
             'home_days_rest': home_rest,
             'away_days_rest': away_rest,
-            'game_of_season': home_feats.get('game_of_season', 1.0), # Game of season can be taken from home team's perspective
-            'travel_factor': away_feats.get('travel_factor', 0.0) # Travel factor applies to the away team
+            'game_of_season': game_of_season,
+            'travel_factor': travel_factor
         }
     elif sport == "nfl":
+        # ... (NFL logic remains the same as it was likely correct)
         if nfl_model is None or nfl_calibration_model is None or nfl_features_df is None:
             return jsonify({'error': 'NFL model or features not loaded.'}), 503
 
         home_team_standard = NFL_TEAM_NAME_MAP.get(home_team_full, home_team_full)
         away_team_standard = NFL_TEAM_NAME_MAP.get(away_team_full, away_team_full)
 
-        # --- Get LATEST OVERALL game for rest days ---
         home_team_last_game_df = nfl_features_df[(nfl_features_df['home_team'] == home_team_standard) | (nfl_features_df['away_team'] == home_team_standard)]
         away_team_last_game_df = nfl_features_df[(nfl_features_df['home_team'] == away_team_standard) | (nfl_features_df['away_team'] == away_team_standard)]
-
-        # --- Get LATEST HOME/AWAY game for performance stats ---
         home_team_latest_home_game_df = nfl_features_df[nfl_features_df['home_team'] == home_team_standard]
         away_team_latest_away_game_df = nfl_features_df[nfl_features_df['away_team'] == away_team_standard]
 
@@ -273,6 +289,9 @@ def predict(sport):
 
         home_city = CITY_MAP.get(home_team_standard)
         weather = get_weather_for_game(home_city)
+        
+        current_season_games = home_team_last_game_df[home_team_last_game_df['commence_time'].dt.year == commence_time.year]
+        game_of_season = len(current_season_games) + 1
 
         final_features = {
             'rolling_avg_adj_pts_scored_home': home_feats.get('rolling_avg_adj_pts_scored_home', 21.0),
@@ -281,7 +300,7 @@ def predict(sport):
             'rolling_avg_adj_pts_allowed_away': away_feats.get('rolling_avg_adj_pts_allowed_away', 21.0),
             'home_days_rest': home_rest,
             'away_days_rest': away_rest,
-            'game_of_season': home_feats.get('game_of_season', 1.0),
+            'game_of_season': game_of_season,
             'temperature': weather['temperature'],
             'wind_speed': weather['wind_speed'],
             'humidity': weather['humidity']
@@ -296,6 +315,12 @@ def predict(sport):
         feature_order = model.get_booster().feature_names
         
         prediction_df = pd.DataFrame([final_features], columns=feature_order)
+        # Ensure all required columns are present, fill with 0 if not
+        for col in feature_order:
+            if col not in prediction_df.columns:
+                prediction_df[col] = 0.0
+        prediction_df = prediction_df[feature_order]
+
 
         raw_prediction = model.predict(prediction_df)[0]
         
