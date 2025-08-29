@@ -65,8 +65,8 @@ MLB_TEAM_NAME_MAP = {
     "METS": "New York Mets", "YANKEES": "New York Yankees", "ATH": "Oakland Athletics"
 }
 
-# Maps MLB team abbreviations to city and state for weather lookup
-CITY_MAP = { 
+# Maps team names to city and state for weather lookup
+CITY_MAP = {
     "Arizona Diamondbacks": "Phoenix,AZ", "Atlanta Braves": "Atlanta,GA", "Baltimore Orioles": "Baltimore,MD", "Boston Red Sox": "Boston,MA",
     "Chicago Cubs": "Chicago,IL", "Chicago White Sox": "Chicago,IL", "Cincinnati Reds": "Cincinnati,OH", "Cleveland Guardians": "Cleveland,OH",
     "Colorado Rockies": "Denver,CO", "Detroit Tigers": "Detroit,MI", "Houston Astros": "Houston,TX", "Kansas City Royals": "Kansas City,MO",
