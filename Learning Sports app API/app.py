@@ -6,6 +6,7 @@ import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime, timezone
+import pytz
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -45,24 +46,48 @@ MLB_TEAM_NAME_MAP = {
     "COL": "Colorado Rockies", "DET": "Detroit Tigers", "HOU": "Houston Astros", "KCR": "Kansas City Royals", "KC": "Kansas City Royals", "LAA": "Los Angeles Angels", "LAD": "Los Angeles Dodgers", "MIA": "Miami Marlins",
     "MIL": "Milwaukee Brewers", "MIN": "Minnesota Twins", "NYM": "New York Mets", "NYY": "New York Yankees",
     "OAK": "Oakland Athletics", "PHI": "Philadelphia Phillies", "PIT": "Pittsburgh Pirates", "SDP": "San Diego Padres", "SD": "San Diego Padres", "SFG": "San Francisco Giants", "SF": "San Francisco Giants", "SEA": "Seattle Mariners", "STL": "St. Louis Cardinals", "TBR": "Tampa Bay Rays",
-    "TB": "Tampa Bay Rays", "TEX": "Texas Rangers", "TOR": "Toronto Blue Jays", "WSN": "Washington Nationals", "WAS": "Washington Nationals", 
+    "TB": "Tampa Bay Rays", "TEX": "Texas Rangers", "TOR": "Toronto Blue Jays", "WSN": "Washington Nationals", "WAS": "Washington Nationals",
     "Arizona Diamondbacks": "Arizona Diamondbacks", "Atlanta Braves": "Atlanta Braves", "Baltimore Orioles": "Baltimore Orioles", "Boston Red Sox": "Boston Red Sox",
-    "Chicago Cubs": "Chicago Cubs", "Chicago White Sox": "Chicago White Sox", "Cincinnati Reds": "Cincinnati Reds", "Cleveland Guardians": "Cleveland Guardians", "Colorado Rockies": "Colorado Rockies",
-    "Detroit Tigers": "Detroit Tigers", "Houston Astros": "Houston Astros", "Kansas City Royals": "Kansas City Royals", "Los Angeles Angels": "Los Angeles Angels", "Los Angeles Dodgers": "Los Angeles Dodgers", "Miami Marlins": "Miami Marlins",
-    "Milwaukee Brewers": "Milwaukee Brewers", "Minnesota Twins": "Minnesota Twins", "New York Mets": "New York Mets", "New York Yankees": "New York Yankees", "Oakland Athletics": "Oakland Athletics", "Philadelphia Phillies": "Philadelphia Phillies",
-    "Pittsburgh Pirates": "Pittsburgh Pirates", "San Diego Padres": "San Diego Padres", "San Francisco Giants": "San Francisco Giants", "Seattle Mariners": "Seattle Mariners", "St. Louis Cardinals": "St. Louis Cardinals", "Tampa Bay Rays": "Tampa Bay Rays",
-    "Texas Rangers": "Texas Rangers", "Toronto Blue Jays": "Toronto Blue Jays", "Washington Nationals": "Washington Nationals",
+    "Chicago Cubs": "Chicago Cubs", "Chicago White Sox": "Chicago White Sox", "Cincinnati Reds": "Cincinnati Reds", "Cleveland Guardians": "Cleveland Guardians",
+    "Colorado Rockies": "Colorado Rockies", "Detroit Tigers": "Detroit Tigers", "Houston Astros": "Houston Astros", "Kansas City Royals": "Kansas City Royals",
+    "Los Angeles Angels": "Los Angeles Angels", "Los Angeles Dodgers": "Los Angeles Dodgers", "Miami Marlins": "Miami Marlins", "Milwaukee Brewers": "Milwaukee Brewers",
+    "Minnesota Twins": "Minnesota Twins", "New York Mets": "New York Mets", "New York Yankees": "New York Yankees", "Oakland Athletics": "Oakland Athletics",
+    "Philadelphia Phillies": "Philadelphia Phillies", "Pittsburgh Pirates": "Pittsburgh Pirates", "San Diego Padres": "San Diego Padres", "San Francisco Giants": "San Francisco Giants",
+    "Seattle Mariners": "Seattle Mariners", "St. Louis Cardinals": "St. Louis Cardinals", "Tampa Bay Rays": "Tampa Bay Rays", "Texas Rangers": "Texas Rangers",
+    "Toronto Blue Jays": "Toronto Blue Jays", "Washington Nationals": "Washington Nationals",
     "Diamondbacks": "Arizona Diamondbacks", "D-backs": "Arizona Diamondbacks", "Braves": "Atlanta Braves", "Orioles": "Baltimore Orioles", "Red Sox": "Boston Red Sox", "Cubs": "Chicago Cubs",
-    "White Sox": "Chicago White Sox", "Reds": "Cincinnati Reds", "Guardians": "Cleveland Guardians", "Indians": "Cleveland Guardians", "Rockies": "Colorado Rockies", "Angels": "Los Angeles Angels",
-    "Dodgers": "Los Angeles Dodgers", "Marlins": "Miami Marlins", "Brewers": "Milwaukee Brewers", "Twins": "Minnesota Twins", "Mets": "New York Mets", "Yankees": "New York Yankees",
-    "Athletics": "Oakland Athletics", "Phillies": "Philadelphia Phillies", "Pirates": "Pittsburgh Pirates", "Padres": "San Diego Padres", "Giants": "San Francisco Giants", "Mariners": "Seattle Mariners",
-    "Cardinals": "St. Louis Cardinals", "Rays": "Tampa Bay Rays", "Rangers": "Texas Rangers", "Blue Jays": "Toronto Blue Jays", "Nationals": "Washington Nationals",
-    "ARZ": "Arizona Diamondbacks", "AZ": "Arizona Diamondbacks", "CWS": "Chicago White Sox", "METS": "New York Mets", "YANKEES": "New York Yankees", "ATH": "Oakland Athletics"
+    "White Sox": "Chicago White Sox", "Reds": "Cincinnati Reds", "Guardians": "Cleveland Guardians", "Indians": "Cleveland Guardians", "Rockies": "Colorado Rockies",
+    "Angels": "Los Angeles Angels", "Dodgers": "Los Angeles Dodgers", "Marlins": "Miami Marlins", "Brewers": "Milwaukee Brewers", "Twins": "Minnesota Twins",
+    "Mets": "New York Mets", "Yankees": "New York Yankees", "Athletics": "Oakland Athletics", "Phillies": "Philadelphia Phillies", "Pirates": "Pittsburgh Pirates",
+    "Padres": "San Diego Padres", "Giants": "San Francisco Giants", "Mariners": "Seattle Mariners", "Cardinals": "St. Louis Cardinals", "Rays": "Tampa Bay Rays",
+    "Rangers": "Texas Rangers", "Blue Jays": "Toronto Blue Jays", "Nationals": "Washington Nationals",
+    "ARZ": "Arizona Diamondbacks", "AZ": "Arizona Diamondbacks", "CWS": "Chicago White Sox", "NY Mets": "New York Mets", "WSH Nationals": "Washington Nationals",
+    "METS": "New York Mets", "YANKEES": "New York Yankees", "ATH": "Oakland Athletics"
 }
 
 # Maps MLB team abbreviations to city and state for weather lookup
-CITY_MAP = { "ARI": "Phoenix,AZ", "ATL": "Atlanta,GA", "BAL": "Baltimore,MD", "BOS": "Boston,MA", "CHC": "Chicago,IL", "CHW": "Chicago,IL", "CIN": "Cincinnati,OH", "CLE": "Cleveland,OH", "COL": "Denver,CO", "DET": "Detroit,MI", "HOU": "Houston,TX", "KC": "Kansas City,MO", "LAA": "Anaheim,CA", "LAD": "Los Angeles,CA", "MIA": "Miami,FL", "MIL": "Milwaukee,WI", "MIN": "Minneapolis,MN", "NYM": "Queens,NY", "NYY": "Bronx,NY", "OAK": "Oakland,CA", "PHI": "Philadelphia,PA", "PIT": "Pittsburgh,PA", "SD": "San Diego,CA", "SF": "San Francisco,CA", "SEA": "Seattle,WA", "STL": "St. Louis,MO", "TB": "St. Petersburg,FL", "TEX": "Arlington,TX", "TOR": "Toronto,ON", "WSH": "Washington,DC" }
+CITY_MAP = { 
+    "Arizona Diamondbacks": "Phoenix,AZ", "Atlanta Braves": "Atlanta,GA", "Baltimore Orioles": "Baltimore,MD", "Boston Red Sox": "Boston,MA",
+    "Chicago Cubs": "Chicago,IL", "Chicago White Sox": "Chicago,IL", "Cincinnati Reds": "Cincinnati,OH", "Cleveland Guardians": "Cleveland,OH",
+    "Colorado Rockies": "Denver,CO", "Detroit Tigers": "Detroit,MI", "Houston Astros": "Houston,TX", "Kansas City Royals": "Kansas City,MO",
+    "Los Angeles Angels": "Anaheim,CA", "Los Angeles Dodgers": "Los Angeles,CA", "Miami Marlins": "Miami,FL", "Milwaukee Brewers": "Milwaukee,WI",
+    "Minnesota Twins": "Minneapolis,MN", "New York Mets": "Queens,NY", "New York Yankees": "Bronx,NY", "Oakland Athletics": "Oakland,CA",
+    "Philadelphia Phillies": "Philadelphia,PA", "Pittsburgh Pirates": "Pittsburgh,PA", "San Diego Padres": "San Diego,CA",
+    "San Francisco Giants": "San Francisco,CA", "Seattle Mariners": "Seattle,WA", "St. Louis Cardinals": "St. Louis,MO",
+    "Tampa Bay Rays": "St. Petersburg,FL", "Texas Rangers": "Arlington,TX", "Toronto Blue Jays": "Toronto,ON", "Washington Nationals": "Washington,DC"
+}
 
+# Maps team names to city timezones for calculating travel factor
+CITY_TIMEZONE_MAP = {
+    "Arizona Diamondbacks": "America/Phoenix", "Atlanta Braves": "America/New_York", "Baltimore Orioles": "America/New_York", "Boston Red Sox": "America/New_York",
+    "Chicago Cubs": "America/Chicago", "Chicago White Sox": "America/Chicago", "Cincinnati Reds": "America/New_York", "Cleveland Guardians": "America/New_York",
+    "Colorado Rockies": "America/Denver", "Detroit Tigers": "America/New_York", "Houston Astros": "America/Chicago", "Kansas City Royals": "America/Chicago",
+    "Los Angeles Angels": "America/Los_Angeles", "Los Angeles Dodgers": "America/Los_Angeles", "Miami Marlins": "America/New_York", "Milwaukee Brewers": "America/Chicago",
+    "Minnesota Twins": "America/Chicago", "New York Mets": "America/New_York", "New York Yankees": "America/New_York", "Oakland Athletics": "America/Los_Angeles",
+    "Philadelphia Phillies": "America/New_York", "Pittsburgh Pirates": "America/New_York", "San Diego Padres": "America/Los_Angeles", "San Francisco Giants": "America/Los_Angeles",
+    "Seattle Mariners": "America/Los_Angeles", "St. Louis Cardinals": "America/Chicago", "Tampa Bay Rays": "America/New_York", "Texas Rangers": "America/Chicago",
+    "Toronto Blue Jays": "America/New_York", "Washington Nationals": "America/New_York"
+}
 
 def get_weather_for_game(city):
     """
@@ -127,30 +152,42 @@ def predict(sport):
     game_data = request.get_json()
     home_team_full = game_data.get('home_team')
     away_team_full = game_data.get('away_team')
+    commence_time_str = game_data.get('commence_time')
 
-    if not all([home_team_full, away_team_full]):
-        return jsonify({'error': 'Missing team data in request body. Requires "home_team" and "away_team".'}), 400
+    if not all([home_team_full, away_team_full, commence_time_str]):
+        return jsonify({'error': 'Missing team or commence time data in request body.'}), 400
+
+    commence_time = datetime.fromisoformat(commence_time_str.replace('Z', '+00:00'))
 
     if sport == "mlb":
         if mlb_model is None or mlb_features_df is None:
             return jsonify({'error': 'MLB model or features not loaded.'}), 503
         
+        # Standardize team names to match the feature files
         home_team_standard = MLB_TEAM_NAME_MAP.get(home_team_full, home_team_full)
         away_team_standard = MLB_TEAM_NAME_MAP.get(away_team_full, away_team_full)
-        
-        home_abbr = next((abbr for abbr, full_name in MLB_TEAM_NAME_MAP.items() if full_name == home_team_standard and len(abbr) <= 4), home_team_full)
-        home_city = CITY_MAP.get(home_abbr)
+
+        home_city = CITY_MAP.get(home_team_standard)
         weather = get_weather_for_game(home_city)
 
         home_feats_row = mlb_features_df[mlb_features_df['team'] == home_team_standard]
         away_feats_row = mlb_features_df[mlb_features_df['team'] == away_team_standard]
 
         if home_feats_row.empty or away_feats_row.empty:
-            return jsonify({'error': f'No MLB features found for one of the teams. Check team names.'}), 404
+            return jsonify({'error': f'No MLB features found for {home_team_full} or {away_team_full}. Check team names.'}), 404
 
         home_feats = home_feats_row.iloc[0].to_dict()
         away_feats = away_feats_row.iloc[0].to_dict()
         
+        # Calculate new fatigue features
+        home_days_rest = float(home_feats.get('home_days_rest_x', 3.0))
+        away_days_rest = float(away_feats.get('away_days_rest_y', 3.0))
+        game_of_season = float(home_feats.get('game_of_season_x', 1.0))
+        
+        home_tz = pytz.timezone(CITY_TIMEZONE_MAP.get(home_team_standard, 'UTC'))
+        away_tz = pytz.timezone(CITY_TIMEZONE_MAP.get(away_team_standard, 'UTC'))
+        home_travel_factor = 1 if home_tz.utcoffset(commence_time) > away_tz.utcoffset(commence_time) else 0
+
         final_features = {
             'rolling_avg_adj_hits_home_perf': float(home_feats.get('rolling_avg_adj_hits_home_perf', 8.0)),
             'rolling_avg_adj_homers_home_perf': float(home_feats.get('rolling_avg_adj_homers_home_perf', 1.0)),
@@ -160,22 +197,26 @@ def predict(sport):
             'rolling_avg_adj_homers_away_perf': float(away_feats.get('rolling_avg_adj_homers_away_perf', 1.0)),
             'rolling_avg_adj_walks_away_perf': float(away_feats.get('rolling_avg_adj_walks_away_perf', 3.0)),
             'rolling_avg_adj_strikeouts_away_perf': float(away_feats.get('rolling_avg_adj_strikeouts_away_perf', 8.0)),
-            'starter_rolling_adj_era_home': float(home_feats.get('starter_rolling_adj_era', 4.5)),
-            'starter_rolling_adj_era_away': float(away_feats.get('starter_rolling_adj_era', 4.5)),
+            'starter_rolling_adj_era_home': float(home_feats.get('starter_rolling_adj_era_home', 4.5)),
+            'starter_rolling_adj_era_away': float(away_feats.get('starter_rolling_adj_era_away', 4.5)),
             'park_factor': float(home_feats.get('park_factor', 9.0)),
-            'bullpen_ip_last_3_days_home': float(home_feats.get('bullpen_ip_last_3_days', 0.0)),
-            'bullpen_ip_last_3_days_away': float(away_feats.get('bullpen_ip_last_3_days', 0.0)),
+            'bullpen_ip_last_3_days_home': float(home_feats.get('bullpen_ip_last_3_days_home', 0.0)),
+            'bullpen_ip_last_3_days_away': float(away_feats.get('bullpen_ip_last_3_days_away', 0.0)),
             'temperature': weather['temperature'],
             'wind_speed': weather['wind_speed'],
             'humidity': weather['humidity'],
+            'home_days_rest': home_days_rest,
+            'away_days_rest': away_days_rest,
+            'game_of_season': game_of_season,
+            'travel_factor': home_travel_factor
         }
         
     elif sport == "nfl":
         if nfl_model is None or nfl_features_df is None:
             return jsonify({'error': 'NFL model or features not loaded.'}), 503
         
-        home_team_standard = home_team_full
-        away_team_standard = away_team_full
+        home_team_standard = NFL_TEAM_NAME_MAP.get(home_team_full, home_team_full)
+        away_team_standard = NFL_TEAM_NAME_MAP.get(away_team_full, away_team_full)
 
         home_feats_row = nfl_features_df[nfl_features_df['team'] == home_team_standard]
         away_feats_row = nfl_features_df[nfl_features_df['team'] == away_team_standard]
@@ -185,12 +226,20 @@ def predict(sport):
         
         home_feats = home_feats_row.iloc[0].to_dict()
         away_feats = away_feats_row.iloc[0].to_dict()
+        
+        # Calculate new fatigue features
+        home_days_rest = float(home_feats.get('home_days_rest', 7.0))
+        away_days_rest = float(away_feats.get('away_days_rest', 7.0))
+        game_of_season = float(home_feats.get('game_of_season', 1.0))
 
         final_features = {
             'rolling_avg_adj_pts_scored_home': float(home_feats.get('rolling_avg_adj_pts_scored_home', 21.0)),
             'rolling_avg_adj_pts_allowed_home': float(home_feats.get('rolling_avg_adj_pts_allowed_home', 21.0)),
             'rolling_avg_adj_pts_scored_away': float(away_feats.get('rolling_avg_adj_pts_scored_away', 21.0)),
             'rolling_avg_adj_pts_allowed_away': float(away_feats.get('rolling_avg_adj_pts_allowed_away', 21.0)),
+            'home_days_rest': home_days_rest,
+            'away_days_rest': away_days_rest,
+            'game_of_season': game_of_season
         }
         
     else:
