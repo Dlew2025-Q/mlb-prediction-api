@@ -72,27 +72,6 @@ MLB_TEAM_NAME_MAP = {
     "METS": "New York Mets", "YANKEES": "New York Yankees", "ATH": "Oakland Athletics", "WSH": "Washington Nationals"
 }
 
-# Mapping for NFL team names
-NFL_TEAM_NAME_MAP = {
-    "ARI": "Arizona Cardinals", "ATL": "Atlanta Falcons", "BAL": "Baltimore Ravens", "BUF": "Buffalo Bills", "CAR": "Carolina Panthers", "CHI": "Chicago Bears",
-    "CIN": "Cincinnati Bengals", "CLE": "Cleveland Browns", "DAL": "Dallas Cowboys", "DEN": "Denver Broncos", "DET": "Detroit Lions", "GB": "Green Bay Packers",
-    "HOU": "Houston Texans", "IND": "Indianapolis Colts", "JAX": "Jacksonville Jaguars", "KC": "Kansas City Chiefs", "LV": "Las Vegas Raiders", "LAC": "Los Angeles Chargers",
-    "LA": "Los Angeles Rams", "MIA": "Miami Dolphins", "MIN": "Minnesota Vikings", "NE": "New England Patriots", "NO": "New Orleans Saints", "NYG": "New York Giants",
-    "NYJ": "New York Jets", "OAK": "Las Vegas Raiders", "PHI": "Philadelphia Eagles", "PIT": "Pittsburgh Steelers", "SF": "San Francisco 49ers", "SEA": "Seattle Seahawks",
-    "TB": "Tampa Bay Buccaneers", "TEN": "Tennessee Titans", "WAS": "Washington Commanders",
-    "Houston Oilers": "Houston Texans",
-    "San Diego Chargers": "Los Angeles Chargers",
-    "St. Louis Cardinals": "Arizona Cardinals",
-    "Washington Redskins": "Washington Commanders",
-    "Baltimore Colts": "Indianapolis Colts",
-    "Boston Patriots": "New England Patriots",
-    "Los Angeles Raiders": "Las Vegas Raiders",
-    "Phoenix Cardinals": "Arizona Cardinals",
-    "St. Louis Rams": "Los Angeles Rams",
-    "Tennessee Oilers": "Tennessee Titans",
-    "Washington Football Team": "Washington Commanders",
-}
-
 # Maps team names to city and state for weather lookup
 CITY_MAP = {
     "Arizona Diamondbacks": "Phoenix,AZ", "Atlanta Braves": "Atlanta,GA", "Baltimore Orioles": "Baltimore,MD", "Boston Red Sox": "Boston,MA",
@@ -198,12 +177,10 @@ def predict(sport):
     starter_rolling_adj_era_home = 4.5
     starter_rolling_adj_era_away = 4.5
     
-    home_team_standard = MLB_TEAM_NAME_MAP.get(home_team_full, home_team_full)
+    home_team_standard = MLB_TEAM_NAME_MAP.get(home_team_full, home_team_full) if sport == 'mlb' else NFL_TEAM_NAME_MAP.get(home_team_full, home_team_full)
     home_city = CITY_MAP.get(home_team_standard)
     weather = get_weather_for_game(home_city)
 
-    # Use a dummy feature set to match the models' expected input.
-    # In a real-world application, this would be calculated from live data.
     final_features = {}
     if sport == "mlb":
         if mlb_model is None or mlb_calibration_model is None or mlb_features_df is None:
@@ -224,26 +201,26 @@ def predict(sport):
 
         # Get values from the loaded features dataframe with correct suffixes
         final_features = {
-            'rolling_avg_adj_hits_home_perf': home_feats.get('rolling_avg_adj_hits_home_perf_home', 8.0),
-            'rolling_avg_adj_homers_home_perf': home_feats.get('rolling_avg_adj_homers_home_perf_home', 1.0),
-            'rolling_avg_adj_walks_home_perf': home_feats.get('rolling_avg_adj_walks_home_perf_home', 3.0),
-            'rolling_avg_adj_strikeouts_home_perf': home_feats.get('rolling_avg_adj_strikeouts_home_perf_home', 8.0),
-            'starter_rolling_adj_era_home': home_feats.get('starter_rolling_adj_era_home_x', 4.5),
-            'park_factor': home_feats.get('park_factor_x', 9.0),
-            'bullpen_ip_last_3_days_home': home_feats.get('bullpen_ip_last_3_days_home_x', 0.0),
-            'rolling_avg_adj_hits_away_perf': away_feats.get('rolling_avg_adj_hits_away_perf_away', 8.0),
-            'rolling_avg_adj_homers_away_perf': away_feats.get('rolling_avg_adj_homers_away_perf_away', 1.0),
-            'rolling_avg_adj_walks_away_perf': away_feats.get('rolling_avg_adj_walks_away_perf_away', 3.0),
-            'rolling_avg_adj_strikeouts_away_perf': away_feats.get('rolling_avg_adj_strikeouts_away_perf_away', 8.0),
-            'starter_rolling_adj_era_away': away_feats.get('starter_rolling_adj_era_away_y', 4.5),
-            'bullpen_ip_last_3_days_away': away_feats.get('bullpen_ip_last_3_days_away_y', 0.0),
+            'rolling_avg_adj_hits_home_perf_home': home_feats.get('rolling_avg_adj_hits_home_perf_home', 8.0),
+            'rolling_avg_adj_homers_home_perf_home': home_feats.get('rolling_avg_adj_homers_home_perf_home', 1.0),
+            'rolling_avg_adj_walks_home_perf_home': home_feats.get('rolling_avg_adj_walks_home_perf_home', 3.0),
+            'rolling_avg_adj_strikeouts_home_perf_home': home_feats.get('rolling_avg_adj_strikeouts_home_perf_home', 8.0),
+            'starter_rolling_adj_era_home_x': home_feats.get('starter_rolling_adj_era_home_x', 4.5),
+            'park_factor_x': home_feats.get('park_factor_x', 9.0),
+            'bullpen_ip_last_3_days_home_x': home_feats.get('bullpen_ip_last_3_days_home_x', 0.0),
+            'rolling_avg_adj_hits_away_perf_away': away_feats.get('rolling_avg_adj_hits_away_perf_away', 8.0),
+            'rolling_avg_adj_homers_away_perf_away': away_feats.get('rolling_avg_adj_homers_away_perf_away', 1.0),
+            'rolling_avg_adj_walks_away_perf_away': away_feats.get('rolling_avg_adj_walks_away_perf_away', 3.0),
+            'rolling_avg_adj_strikeouts_away_perf_away': away_feats.get('rolling_avg_adj_strikeouts_away_perf_away', 8.0),
+            'starter_rolling_adj_era_away_y': away_feats.get('starter_rolling_adj_era_away_y', 4.5),
+            'bullpen_ip_last_3_days_away_y': away_feats.get('bullpen_ip_last_3_days_away_y', 0.0),
             'temperature': weather['temperature'],
             'wind_speed': weather['wind_speed'],
             'humidity': weather['humidity'],
-            'home_days_rest': home_feats.get('home_days_rest_x', 3.0),
-            'away_days_rest': away_feats.get('away_days_rest_y', 3.0),
-            'game_of_season': home_feats.get('game_of_season_x', 1.0),
-            'travel_factor': home_feats.get('travel_factor_x', 0.0)
+            'home_days_rest_x': home_feats.get('home_days_rest_x', 3.0),
+            'away_days_rest_y': away_feats.get('away_days_rest_y', 3.0),
+            'game_of_season_x': home_feats.get('game_of_season_x', 1.0),
+            'travel_factor_x': home_feats.get('travel_factor_x', 0.0)
         }
     elif sport == "nfl":
         if nfl_model is None or nfl_calibration_model is None or nfl_features_df is None:
@@ -253,8 +230,8 @@ def predict(sport):
         home_team_standard = NFL_TEAM_NAME_MAP.get(home_team_full, home_team_full)
         away_team_standard = NFL_TEAM_NAME_MAP.get(away_team_full, away_team_full)
 
-        home_feats_row = nfl_features_df[nfl_features_df['home_team'] == home_team_standard]
-        away_feats_row = nfl_features_df[nfl_features_df['away_team'] == away_team_standard]
+        home_feats_row = nfl_features_df[nfl_features_df['team'] == home_team_standard]
+        away_feats_row = nfl_features_df[nfl_features_df['team'] == away_team_standard]
         
         if home_feats_row.empty or away_feats_row.empty:
             return jsonify({'error': f'No NFL features found for {home_team_full} or {away_team_full} in the loaded features file.'}), 404
