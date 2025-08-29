@@ -37,8 +37,10 @@ def load_pickle(path):
 # Attempt to load the trained models and feature dataframes for MLB and NFL
 mlb_model = load_pickle('mlb_total_runs_model.pkl')
 mlb_calibration_model = load_pickle('mlb_calibration_model.pkl')
+mlb_features_df = load_pickle('latest_features.pkl')
 nfl_model = load_pickle('nfl_total_points_model.pkl')
 nfl_calibration_model = load_pickle('nfl_calibration_model.pkl')
+nfl_features_df = load_pickle('latest_nfl_features.pkl')
 
 # --- CONFIGURATION ---
 # Get API keys from environment variables for security
@@ -204,52 +206,74 @@ def predict(sport):
     # In a real-world application, this would be calculated from live data.
     final_features = {}
     if sport == "mlb":
-        if mlb_model is None or mlb_calibration_model is None:
-            return jsonify({'error': 'MLB model or calibration model not loaded.'}), 503
+        if mlb_model is None or mlb_calibration_model is None or mlb_features_df is None:
+            return jsonify({'error': 'MLB model or features not loaded.'}), 503
         
-        home_tz_name = CITY_TIMEZONE_MAP.get(home_team_standard, 'UTC')
-        away_tz_name = CITY_TIMEZONE_MAP.get(away_team_full, 'UTC')
-        try:
-            home_tz = pytz.timezone(home_tz_name)
-            away_tz = pytz.timezone(away_tz_name)
-            travel_factor = (home_tz.utcoffset(commence_time) - away_tz.utcoffset(commence_time)).total_seconds() / 3600
-        except pytz.UnknownTimeZoneError:
-            travel_factor = 0.0
+        # Standardize team names
+        home_team_standard = MLB_TEAM_NAME_MAP.get(home_team_full, home_team_full)
+        away_team_standard = MLB_TEAM_NAME_MAP.get(away_team_full, away_team_full)
 
+        home_feats_row = mlb_features_df[mlb_features_df['team'] == home_team_standard]
+        away_feats_row = mlb_features_df[mlb_features_df['team'] == away_team_standard]
+
+        if home_feats_row.empty or away_feats_row.empty:
+            return jsonify({'error': f'No MLB features found for {home_team_full} or {away_team_full} in the loaded features file.'}), 404
+        
+        home_feats = home_feats_row.iloc[0].to_dict()
+        away_feats = away_feats_row.iloc[0].to_dict()
+
+        # Get values from the loaded features dataframe with correct suffixes
         final_features = {
-            'rolling_avg_adj_hits_home_perf': 8.0,
-            'rolling_avg_adj_homers_home_perf': 1.0,
-            'rolling_avg_adj_walks_home_perf': 3.0,
-            'rolling_avg_adj_strikeouts_home_perf': 8.0,
-            'starter_rolling_adj_era_home': starter_rolling_adj_era_home,
-            'park_factor': park_factor,
-            'bullpen_ip_last_3_days_home': bullpen_ip_last_3_days_home,
-            'rolling_avg_adj_hits_away_perf': 8.0,
-            'rolling_avg_adj_homers_away_perf': 1.0,
-            'rolling_avg_adj_walks_away_perf': 3.0,
-            'rolling_avg_adj_strikeouts_away_perf': 8.0,
-            'starter_rolling_adj_era_away': starter_rolling_adj_era_away,
-            'bullpen_ip_last_3_days_away': bullpen_ip_last_3_days_away,
+            'rolling_avg_adj_hits_home_perf': home_feats.get('rolling_avg_adj_hits_home_perf_home', 8.0),
+            'rolling_avg_adj_homers_home_perf': home_feats.get('rolling_avg_adj_homers_home_perf_home', 1.0),
+            'rolling_avg_adj_walks_home_perf': home_feats.get('rolling_avg_adj_walks_home_perf_home', 3.0),
+            'rolling_avg_adj_strikeouts_home_perf': home_feats.get('rolling_avg_adj_strikeouts_home_perf_home', 8.0),
+            'starter_rolling_adj_era_home': home_feats.get('starter_rolling_adj_era_home_x', 4.5),
+            'park_factor': home_feats.get('park_factor_x', 9.0),
+            'bullpen_ip_last_3_days_home': home_feats.get('bullpen_ip_last_3_days_home_x', 0.0),
+            'rolling_avg_adj_hits_away_perf': away_feats.get('rolling_avg_adj_hits_away_perf_away', 8.0),
+            'rolling_avg_adj_homers_away_perf': away_feats.get('rolling_avg_adj_homers_away_perf_away', 1.0),
+            'rolling_avg_adj_walks_away_perf': away_feats.get('rolling_avg_adj_walks_away_perf_away', 3.0),
+            'rolling_avg_adj_strikeouts_away_perf': away_feats.get('rolling_avg_adj_strikeouts_away_perf_away', 8.0),
+            'starter_rolling_adj_era_away': away_feats.get('starter_rolling_adj_era_away_y', 4.5),
+            'bullpen_ip_last_3_days_away': away_feats.get('bullpen_ip_last_3_days_away_y', 0.0),
             'temperature': weather['temperature'],
             'wind_speed': weather['wind_speed'],
             'humidity': weather['humidity'],
-            'home_days_rest': home_days_rest,
-            'away_days_rest': away_days_rest,
-            'game_of_season': game_of_season,
-            'travel_factor': travel_factor
+            'home_days_rest': home_feats.get('home_days_rest_x', 3.0),
+            'away_days_rest': away_feats.get('away_days_rest_y', 3.0),
+            'game_of_season': home_feats.get('game_of_season_x', 1.0),
+            'travel_factor': home_feats.get('travel_factor_x', 0.0)
         }
     elif sport == "nfl":
-        if nfl_model is None or nfl_calibration_model is None:
-            return jsonify({'error': 'NFL model or calibration model not loaded.'}), 503
+        if nfl_model is None or nfl_calibration_model is None or nfl_features_df is None:
+            return jsonify({'error': 'NFL model or features not loaded.'}), 503
+
+        # Standardize team names
+        home_team_standard = NFL_TEAM_NAME_MAP.get(home_team_full, home_team_full)
+        away_team_standard = NFL_TEAM_NAME_MAP.get(away_team_full, away_team_full)
+
+        home_feats_row = nfl_features_df[nfl_features_df['home_team'] == home_team_standard]
+        away_feats_row = nfl_features_df[nfl_features_df['away_team'] == away_team_standard]
+        
+        if home_feats_row.empty or away_feats_row.empty:
+            return jsonify({'error': f'No NFL features found for {home_team_full} or {away_team_full} in the loaded features file.'}), 404
+        
+        home_feats = home_feats_row.iloc[0].to_dict()
+        away_feats = away_feats_row.iloc[0].to_dict()
+
+        # Use home team city for weather
+        home_city = CITY_MAP.get(home_team_standard)
+        weather = get_weather_for_game(home_city)
 
         final_features = {
-            'rolling_avg_adj_pts_scored_home': 21.0,
-            'rolling_avg_adj_pts_allowed_home': 21.0,
-            'rolling_avg_adj_pts_scored_away': 21.0,
-            'rolling_avg_adj_pts_allowed_away': 21.0,
-            'home_days_rest': home_days_rest,
-            'away_days_rest': away_days_rest,
-            'game_of_season': game_of_season,
+            'rolling_avg_adj_pts_scored_home': home_feats.get('rolling_avg_adj_pts_scored_home', 21.0),
+            'rolling_avg_adj_pts_allowed_home': home_feats.get('rolling_avg_adj_pts_allowed_home', 21.0),
+            'rolling_avg_adj_pts_scored_away': away_feats.get('rolling_avg_adj_pts_scored_away', 21.0),
+            'rolling_avg_adj_pts_allowed_away': away_feats.get('rolling_avg_adj_pts_allowed_away', 21.0),
+            'home_days_rest': home_feats.get('home_days_rest', 7.0),
+            'away_days_rest': away_feats.get('away_days_rest', 7.0),
+            'game_of_season': home_feats.get('game_of_season', 1.0),
             'temperature': weather['temperature'],
             'wind_speed': weather['wind_speed'],
             'humidity': weather['humidity']
