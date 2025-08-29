@@ -43,6 +43,18 @@ nfl_model = load_pickle('nfl_total_points_model.pkl')
 nfl_calibration_model = load_pickle('nfl_calibration_model.pkl')
 nfl_features_df = load_pickle('latest_nfl_features.pkl')
 
+# FIX: Ensure data is sorted upon loading to guarantee `.iloc[-1]` gets the latest game.
+# This is the primary fix for the model returning uniform, incorrect predictions.
+if mlb_features_df is not None:
+    mlb_features_df['commence_time'] = pd.to_datetime(mlb_features_df['commence_time'], utc=True)
+    mlb_features_df.dropna(subset=['commence_time'], inplace=True)
+    mlb_features_df.sort_values('commence_time', inplace=True)
+
+if nfl_features_df is not None:
+    nfl_features_df['commence_time'] = pd.to_datetime(nfl_features_df['commence_time'], utc=True)
+    nfl_features_df.dropna(subset=['commence_time'], inplace=True)
+    nfl_features_df.sort_values('commence_time', inplace=True)
+
 
 # --- CONFIGURATION ---
 # Get API keys from environment variables for security
@@ -185,9 +197,6 @@ def predict(sport):
         home_team_standard = MLB_TEAM_NAME_MAP.get(home_team_full, home_team_full)
         away_team_standard = MLB_TEAM_NAME_MAP.get(away_team_full, away_team_full)
 
-        # FIX: The logic was not correctly distinguishing between home and away stats.
-        # This new logic gets the correct stats for each team's role in the upcoming game.
-
         # --- Get LATEST OVERALL game to calculate true rest days ---
         home_team_last_game_df = mlb_features_df[(mlb_features_df['home_team'] == home_team_standard) | (mlb_features_df['away_team'] == home_team_standard)]
         away_team_last_game_df = mlb_features_df[(mlb_features_df['home_team'] == away_team_standard) | (mlb_features_df['away_team'] == away_team_standard)]
@@ -206,8 +215,8 @@ def predict(sport):
         away_feats = away_team_latest_away_game_df.iloc[-1].to_dict()
 
         # Calculate days of rest until the upcoming game
-        home_rest = (commence_time - pd.to_datetime(home_team_last_game['commence_time'])).days
-        away_rest = (commence_time - pd.to_datetime(away_team_last_game['commence_time'])).days
+        home_rest = (commence_time - home_team_last_game['commence_time']).days
+        away_rest = (commence_time - away_team_last_game['commence_time']).days
 
         home_city = CITY_MAP.get(home_team_standard)
         weather = get_weather_for_game(home_city)
@@ -259,8 +268,8 @@ def predict(sport):
         home_feats = home_team_latest_home_game_df.iloc[-1].to_dict()
         away_feats = away_team_latest_away_game_df.iloc[-1].to_dict()
 
-        home_rest = (commence_time - pd.to_datetime(home_team_last_game['commence_time'])).days
-        away_rest = (commence_time - pd.to_datetime(away_team_last_game['commence_time'])).days
+        home_rest = (commence_time - home_team_last_game['commence_time']).days
+        away_rest = (commence_time - away_team_last_game['commence_time']).days
 
         home_city = CITY_MAP.get(home_team_standard)
         weather = get_weather_for_game(home_city)
