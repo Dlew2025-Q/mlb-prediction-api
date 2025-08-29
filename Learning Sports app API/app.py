@@ -32,7 +32,7 @@ def load_pickle(path):
 # Attempt to load the trained models and feature dataframes for MLB and NFL
 mlb_model = load_pickle('mlb_total_runs_model.pkl')
 nfl_model = load_pickle('nfl_total_points_model.pkl')
-mlb_features_df = load_pickle('latest_features.pkl') 
+mlb_features_df = load_pickle('latest_features.pkl')
 nfl_features_df = load_pickle('latest_nfl_features.pkl')
 
 # --- CONFIGURATION ---
@@ -94,7 +94,7 @@ def get_weather_for_game(city):
     Fetches current weather conditions for a given city from the Visual Crossing API.
     Returns default values if the API key is missing or the request fails.
     """
-    if not WEATHER_API_KEY or not city: 
+    if not WEATHER_API_KEY or not city:
         return {'temperature': 70.0, 'wind_speed': 5.0, 'humidity': 50.0}
     
     url = f"https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/{city}/today?unitGroup=us&include=current&key={WEATHER_API_KEY}&contentType=json"
@@ -104,7 +104,7 @@ def get_weather_for_game(city):
         response.raise_for_status() # Raises an HTTPError for bad responses (4xx or 5xx)
         weather_data = response.json()
         current_conditions = weather_data.get('currentConditions', {})
-        return { 
+        return {
             'temperature': float(current_conditions.get('temp', 70.0)),
             'wind_speed': float(current_conditions.get('windspeed', 5.0)),
             'humidity': float(current_conditions.get('humidity', 50.0))
@@ -180,13 +180,23 @@ def predict(sport):
         away_feats = away_feats_row.iloc[0].to_dict()
         
         # Calculate new fatigue features
+        # The column names in the pkl file are based on how they were created.
+        # Home team's features get a '_x' suffix and away team's get a '_y'
         home_days_rest = float(home_feats.get('home_days_rest_x', 3.0))
         away_days_rest = float(away_feats.get('away_days_rest_y', 3.0))
         game_of_season = float(home_feats.get('game_of_season_x', 1.0))
         
-        home_tz = pytz.timezone(CITY_TIMEZONE_MAP.get(home_team_standard, 'UTC'))
-        away_tz = pytz.timezone(CITY_TIMEZONE_MAP.get(away_team_standard, 'UTC'))
-        home_travel_factor = 1 if home_tz.utcoffset(commence_time) > away_tz.utcoffset(commence_time) else 0
+        home_tz_name = CITY_TIMEZONE_MAP.get(home_team_standard, 'UTC')
+        away_tz_name = CITY_TIMEZONE_MAP.get(away_team_standard, 'UTC')
+        
+        try:
+            home_tz = pytz.timezone(home_tz_name)
+            away_tz = pytz.timezone(away_tz_name)
+            # Calculate the time difference in hours and use it to determine travel factor
+            # Eastward travel (positive difference) is more fatiguing
+            travel_factor = (home_tz.utcoffset(commence_time) - away_tz.utcoffset(commence_time)).total_seconds() / 3600
+        except pytz.UnknownTimeZoneError:
+            travel_factor = 0.0
 
         final_features = {
             'rolling_avg_adj_hits_home_perf': float(home_feats.get('rolling_avg_adj_hits_home_perf', 8.0)),
@@ -199,16 +209,16 @@ def predict(sport):
             'rolling_avg_adj_strikeouts_away_perf': float(away_feats.get('rolling_avg_adj_strikeouts_away_perf', 8.0)),
             'starter_rolling_adj_era_home': float(home_feats.get('starter_rolling_adj_era_home', 4.5)),
             'starter_rolling_adj_era_away': float(away_feats.get('starter_rolling_adj_era_away', 4.5)),
-            'park_factor': float(home_feats.get('park_factor', 9.0)),
-            'bullpen_ip_last_3_days_home': float(home_feats.get('bullpen_ip_last_3_days_home', 0.0)),
-            'bullpen_ip_last_3_days_away': float(away_feats.get('bullpen_ip_last_3_days_away', 0.0)),
+            'park_factor': float(home_feats.get('park_factor_x', 9.0)),
+            'bullpen_ip_last_3_days_home': float(home_feats.get('bullpen_ip_last_3_days_x', 0.0)),
+            'bullpen_ip_last_3_days_away': float(away_feats.get('bullpen_ip_last_3_days_y', 0.0)),
             'temperature': weather['temperature'],
             'wind_speed': weather['wind_speed'],
             'humidity': weather['humidity'],
             'home_days_rest': home_days_rest,
             'away_days_rest': away_days_rest,
             'game_of_season': game_of_season,
-            'travel_factor': home_travel_factor
+            'travel_factor': travel_factor
         }
         
     elif sport == "nfl":
@@ -228,9 +238,9 @@ def predict(sport):
         away_feats = away_feats_row.iloc[0].to_dict()
         
         # Calculate new fatigue features
-        home_days_rest = float(home_feats.get('home_days_rest', 7.0))
-        away_days_rest = float(away_feats.get('away_days_rest', 7.0))
-        game_of_season = float(home_feats.get('game_of_season', 1.0))
+        home_days_rest = float(home_feats.get('home_days_rest_x', 7.0))
+        away_days_rest = float(away_feats.get('away_days_rest_y', 7.0))
+        game_of_season = float(home_feats.get('game_of_season_x', 1.0))
 
         final_features = {
             'rolling_avg_adj_pts_scored_home': float(home_feats.get('rolling_avg_adj_pts_scored_home', 21.0)),
