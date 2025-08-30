@@ -169,16 +169,18 @@ def get_feature(feat_dict, key, default):
 def predict(sport):
     """
     API endpoint to make a total score prediction for a game based on a POST request.
-    It takes home and away team names and returns a predicted total and confidence score.
+    It takes home and away team names, and the market line, then returns a predicted
+    total, confidence score, edge, and a suggestion (Over/Under/Hold).
     """
     sport = sport.lower()
     game_data = request.get_json()
     home_team_full = game_data.get('home_team')
     away_team_full = game_data.get('away_team')
     commence_time_str = game_data.get('commence_time')
+    market_line = game_data.get('market_line') 
     
-    if not all([home_team_full, away_team_full, commence_time_str]):
-        return jsonify({'error': 'Missing team or commence time data in request body.'}), 400
+    if not all([home_team_full, away_team_full, commence_time_str, market_line is not None]):
+        return jsonify({'error': 'Missing team, commence time, or market line data in request body.'}), 400
     
     commence_time = datetime.fromisoformat(commence_time_str.replace('Z', '+00:00'))
 
@@ -187,7 +189,6 @@ def predict(sport):
         if mlb_model is None or mlb_calibration_model is None or mlb_features_df is None:
             return jsonify({'error': 'MLB model or features not loaded.'}), 503
         
-        # Standardize team names
         home_team_standard = MLB_TEAM_NAME_MAP.get(home_team_full, home_team_full)
         away_team_standard = MLB_TEAM_NAME_MAP.get(away_team_full, away_team_full)
 
@@ -205,7 +206,6 @@ def predict(sport):
         home_city = CITY_MAP.get(home_team_standard)
         weather = get_weather_for_game(home_city)
         
-        # FIX: Re-introduce dynamic calculation of features
         last_home_game_time = pd.to_datetime(home_feats['commence_time'], utc=True)
         last_away_game_time = pd.to_datetime(away_feats['commence_time'], utc=True)
         home_days_rest = (commence_time - last_home_game_time).days
@@ -263,21 +263,6 @@ def predict(sport):
             'travel_factor': travel_factor
         }
         
-        if home_team_standard == "Minnesota Twins" or away_team_standard == "Minnesota Twins":
-            print("\n--- MINNESOTA TWINS GAME LOG ---")
-            print(f"Game: {away_team_full} at {home_team_full}")
-            print("\n[1] Raw Home Team Features (from last home game):")
-            print(pd.Series(home_feats))
-            print("\n[2] Raw Away Team Features (from last away game):")
-            print(pd.Series(away_feats))
-            print("\n[3] Dynamically Calculated Features:")
-            print(f"  - home_days_rest: {home_days_rest}")
-            print(f"  - away_days_rest: {away_days_rest}")
-            print(f"  - game_of_season: {game_of_season}")
-            print(f"  - travel_factor: {travel_factor}")
-            print("\n[4] Final Features Sent to Model:")
-            print(pd.Series(final_features))
-
     elif sport == "nfl":
         if nfl_model is None or nfl_calibration_model is None or nfl_features_df is None:
             return jsonify({'error': 'NFL model or features not loaded.'}), 503
@@ -324,17 +309,33 @@ def predict(sport):
 
         raw_prediction = model.predict(prediction_df)[0]
         
-        if sport == "mlb" and (home_team_standard == "Minnesota Twins" or away_team_standard == "Minnesota Twins"):
-             print(f"\n[5] Raw Model Prediction: {raw_prediction}")
-             print("--- END TWINS LOG ---\n")
-
         confidence_df = pd.DataFrame([{'raw_prediction': raw_prediction}])
         confidence_score = calibration_model.predict_proba(confidence_df.values.reshape(-1, 1))[0][1]
 
+        # FIX: Add logic to determine Over/Under/Hold suggestion
+        suggestion = "Hold"
+        edge = 0
+        try:
+             # Ensure market_line is a float for calculation
+             market_line_float = float(market_line)
+             edge = raw_prediction - market_line_float
+             
+             # Define thresholds for making a suggestion
+             MIN_CONFIDENCE = 0.30  # 30% confidence
+             MIN_EDGE = 0.5         # At least a half-run edge
+             
+             if edge > MIN_EDGE and confidence_score > MIN_CONFIDENCE:
+                 suggestion = "Over"
+             elif edge < -MIN_EDGE and confidence_score > MIN_CONFIDENCE:
+                 suggestion = "Under"
+        except (ValueError, TypeError):
+            pass
 
         return jsonify({
             'predicted_total_runs': float(raw_prediction),
-            'confidence': float(confidence_score)
+            'confidence': float(confidence_score),
+            'suggestion': suggestion,
+            'edge': float(edge)
         })
     except Exception as e:
         return jsonify({'error': f'Prediction error: {str(e)}'}), 500
