@@ -177,10 +177,11 @@ def predict(sport):
     home_team_full = game_data.get('home_team')
     away_team_full = game_data.get('away_team')
     commence_time_str = game_data.get('commence_time')
-    market_line = game_data.get('market_line') 
+    market_line = game_data.get('market_line') # This is now optional
     
-    if not all([home_team_full, away_team_full, commence_time_str, market_line is not None]):
-        return jsonify({'error': 'Missing team, commence time, or market line data in request body.'}), 400
+    # FIX: Make market_line optional in the check
+    if not all([home_team_full, away_team_full, commence_time_str]):
+        return jsonify({'error': 'Missing team or commence time data in request body.'}), 400
     
     commence_time = datetime.fromisoformat(commence_time_str.replace('Z', '+00:00'))
 
@@ -312,24 +313,24 @@ def predict(sport):
         confidence_df = pd.DataFrame([{'raw_prediction': raw_prediction}])
         confidence_score = calibration_model.predict_proba(confidence_df.values.reshape(-1, 1))[0][1]
 
-        # FIX: Add logic to determine Over/Under/Hold suggestion
         suggestion = "Hold"
         edge = 0
-        try:
-             # Ensure market_line is a float for calculation
-             market_line_float = float(market_line)
-             edge = raw_prediction - market_line_float
-             
-             # Define thresholds for making a suggestion
-             MIN_CONFIDENCE = 0.30  # 30% confidence
-             MIN_EDGE = 0.5         # At least a half-run edge
-             
-             if edge > MIN_EDGE and confidence_score > MIN_CONFIDENCE:
-                 suggestion = "Over"
-             elif edge < -MIN_EDGE and confidence_score > MIN_CONFIDENCE:
-                 suggestion = "Under"
-        except (ValueError, TypeError):
-            pass
+        # Only calculate suggestion if market_line was provided
+        if market_line is not None:
+            try:
+                 market_line_float = float(market_line)
+                 edge = raw_prediction - market_line_float
+                 
+                 MIN_CONFIDENCE = 0.30
+                 MIN_EDGE = 0.5
+                 
+                 if edge > MIN_EDGE and confidence_score > MIN_CONFIDENCE:
+                     suggestion = "Over"
+                 elif edge < -MIN_EDGE and confidence_score > MIN_CONFIDENCE:
+                     suggestion = "Under"
+            except (ValueError, TypeError):
+                # If market_line is invalid, just default to Hold
+                pass
 
         return jsonify({
             'predicted_total_runs': float(raw_prediction),
