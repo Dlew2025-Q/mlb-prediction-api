@@ -177,7 +177,6 @@ def predict(sport):
         home_team_standard = MLB_TEAM_NAME_MAP.get(home_team_full, home_team_full)
         away_team_standard = MLB_TEAM_NAME_MAP.get(away_team_full, away_team_full)
 
-        # FIX: Ensure dataframe is sorted by date before selecting the last game
         mlb_features_df['commence_time'] = pd.to_datetime(mlb_features_df['commence_time'], utc=True)
         sorted_mlb_features = mlb_features_df.sort_values('commence_time')
 
@@ -193,7 +192,6 @@ def predict(sport):
         home_city = CITY_MAP.get(home_team_standard)
         weather = get_weather_for_game(home_city)
         
-        # Calculate dynamic features
         last_home_game_time = pd.to_datetime(home_feats['commence_time'], utc=True)
         last_away_game_time = pd.to_datetime(away_feats['commence_time'], utc=True)
         home_days_rest = (commence_time - last_home_game_time).days
@@ -217,7 +215,6 @@ def predict(sport):
         ]
         if not away_team_previous_games.empty:
             last_game = away_team_previous_games.iloc[-1]
-            # Determine location of the last game
             last_game_location_team = last_game['home_team']
             previous_city_tz = get_tz_offset(last_game_location_team)
             current_city_tz = get_tz_offset(home_team_standard)
@@ -225,6 +222,7 @@ def predict(sport):
         else:
             travel_factor = 0.0
 
+        # FIX: Ensure feature names here EXACTLY match the names the model was trained on
         final_features = {
             'rolling_avg_adj_hits_home': home_feats.get('rolling_avg_adj_hits_home', 8.0),
             'rolling_avg_adj_homers_home': home_feats.get('rolling_avg_adj_homers_home', 1.0),
@@ -252,7 +250,6 @@ def predict(sport):
             'travel_factor': travel_factor
         }
         
-        # FIX: Add detailed logging for Minnesota Twins games to debug high totals
         if home_team_standard == "Minnesota Twins" or away_team_standard == "Minnesota Twins":
             print("\n--- MINNESOTA TWINS GAME LOG ---")
             print(f"Game: {away_team_full} at {home_team_full}")
@@ -272,7 +269,7 @@ def predict(sport):
         if nfl_model is None or nfl_calibration_model is None or nfl_features_df is None:
             return jsonify({'error': 'NFL model or features not loaded.'}), 503
 
-        home_team_standard = home_team_full # Assuming NFL names are already standard
+        home_team_standard = home_team_full
         away_team_standard = away_team_full
 
         nfl_features_df['commence_time'] = pd.to_datetime(nfl_features_df['commence_time'], utc=True)
@@ -320,7 +317,10 @@ def predict(sport):
              print("--- END TWINS LOG ---\n")
 
         confidence_df = pd.DataFrame([{'raw_prediction': raw_prediction}])
-        confidence_score = calibration_model.predict_proba(confidence_df.values.reshape(-1, 1))[0][1]
+        # Provide feature names to the calibration model's dataframe to resolve the warning
+        confidence_df.columns = ['raw_prediction']
+        confidence_score = calibration_model.predict_proba(confidence_df)[0][1]
+
 
         return jsonify({
             'predicted_total_runs': float(raw_prediction),
