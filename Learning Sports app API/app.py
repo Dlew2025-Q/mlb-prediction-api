@@ -17,6 +17,7 @@ CORS(app)
 
 # Suppress the UserWarning from pandas about merging on non-unique columns
 warnings.filterwarnings('ignore', category=UserWarning, message='You are merging on an intermediate')
+warnings.filterwarnings('ignore', category=UserWarning, message='X does not have valid feature names')
 
 # --- LOAD MODELS AND FEATURES ---
 def load_pickle(path):
@@ -86,18 +87,6 @@ CITY_MAP = {
     "Tampa Bay Rays": "St. Petersburg,FL", "Texas Rangers": "Arlington,TX", "Toronto Blue Jays": "Toronto,ON", "Washington Nationals": "Washington,DC"
 }
 
-# Maps team names to city timezones for calculating travel factor
-CITY_TIMEZONE_MAP = {
-    "Arizona Diamondbacks": "America/Phoenix", "Atlanta Braves": "America/New_York", "Baltimore Orioles": "America/New_York", "Boston Red Sox": "America/New_York",
-    "Chicago Cubs": "America/Chicago", "Chicago White Sox": "America/Chicago", "Cincinnati Reds": "America/New_York", "Cleveland Guardians": "America/New_York",
-    "Colorado Rockies": "America/Denver", "Detroit Tigers": "America/New_York", "Houston Astros": "America/Chicago", "Kansas City Royals": "America/Chicago",
-    "Los Angeles Angels": "America/Los_Angeles", "Los Angeles Dodgers": "America/Los_Angeles", "Miami Marlins": "America/New_York", "Milwaukee Brewers": "America/Chicago",
-    "Minnesota Twins": "America/Chicago", "New York Mets": "America/New_York", "New York Yankees": "America/New_York", "Oakland Athletics": "America/Los_Angeles",
-    "Philadelphia Phillies": "America/New_York", "Pittsburgh Pirates": "America/New_York", "San Diego Padres": "America/Los_Angeles", "San Francisco Giants": "America/Los_Angeles",
-    "Seattle Mariners": "America/Los_Angeles", "St. Louis Cardinals": "America/Chicago", "Tampa Bay Rays": "America/New_York", "Texas Rangers": "America/Chicago",
-    "Toronto Blue Jays": "America/New_York", "Washington Nationals": "America/New_York"
-}
-
 def get_weather_for_game(city):
     """
     Fetches current weather conditions for a given city from the Visual Crossing API.
@@ -151,6 +140,13 @@ def get_games(sport):
     except requests.exceptions.RequestException as e:
         return jsonify({'error': f'Failed to fetch data from The Odds API: {e}'}), 502
 
+def get_feature(feat_dict, key, default):
+    """Safely gets a feature, returning default if key is missing or value is NaN."""
+    val = feat_dict.get(key)
+    if val is None or pd.isna(val):
+        return default
+    return val
+
 @app.route('/predict/<sport>', methods=['POST'])
 def predict(sport):
     """
@@ -161,12 +157,9 @@ def predict(sport):
     game_data = request.get_json()
     home_team_full = game_data.get('home_team')
     away_team_full = game_data.get('away_team')
-    commence_time_str = game_data.get('commence_time')
-
-    if not all([home_team_full, away_team_full, commence_time_str]):
-        return jsonify({'error': 'Missing team or commence time data in request body.'}), 400
-
-    commence_time = datetime.fromisoformat(commence_time_str.replace('Z', '+00:00'))
+    
+    if not all([home_team_full, away_team_full]):
+        return jsonify({'error': 'Missing team data in request body.'}), 400
     
     final_features = {}
     if sport == "mlb":
@@ -192,62 +185,28 @@ def predict(sport):
         home_city = CITY_MAP.get(home_team_standard)
         weather = get_weather_for_game(home_city)
         
-        last_home_game_time = pd.to_datetime(home_feats['commence_time'], utc=True)
-        last_away_game_time = pd.to_datetime(away_feats['commence_time'], utc=True)
-        home_days_rest = (commence_time - last_home_game_time).days
-        away_days_rest = (commence_time - last_away_game_time).days
-
-        current_year = commence_time.year
-        home_games_this_season = sorted_mlb_features[
-            (sorted_mlb_features['commence_time'].dt.year == current_year) & 
-            ((sorted_mlb_features['home_team'] == home_team_standard) | (sorted_mlb_features['away_team'] == home_team_standard))
-        ]
-        game_of_season = len(home_games_this_season) + 1
-        
-        def get_tz_offset(team_name):
-            tz_name = CITY_TIMEZONE_MAP.get(team_name)
-            if not tz_name: return 0
-            try: return datetime(2023, 7, 1, tzinfo=pytz.timezone(tz_name)).utcoffset().total_seconds() / 3600
-            except pytz.UnknownTimeZoneError: return 0
-
-        away_team_previous_games = sorted_mlb_features[
-            (sorted_mlb_features['home_team'] == away_team_standard) | (sorted_mlb_features['away_team'] == away_team_standard)
-        ]
-        if not away_team_previous_games.empty:
-            last_game = away_team_previous_games.iloc[-1]
-            last_game_location_team = last_game['home_team']
-            previous_city_tz = get_tz_offset(last_game_location_team)
-            current_city_tz = get_tz_offset(home_team_standard)
-            travel_factor = abs(current_city_tz - previous_city_tz)
-        else:
-            travel_factor = 0.0
-
-        # FIX: Ensure feature names here EXACTLY match the names the model was trained on
+        # FIX: Simplified the feature set to match the retrained model
         final_features = {
-            'rolling_avg_adj_hits_home': home_feats.get('rolling_avg_adj_hits_home', 8.0),
-            'rolling_avg_adj_homers_home': home_feats.get('rolling_avg_adj_homers_home', 1.0),
-            'rolling_avg_adj_walks_home': home_feats.get('rolling_avg_adj_walks_home', 3.0),
-            'rolling_avg_adj_strikeouts_home': home_feats.get('rolling_avg_adj_strikeouts_home', 8.0),
-            'starter_rolling_adj_era_home': home_feats.get('starter_rolling_adj_era_home', 4.5),
-            'starter_rolling_whip_home': home_feats.get('starter_rolling_whip_home', 1.3),
-            'starter_rolling_k_per_9_home': home_feats.get('starter_rolling_k_per_9_home', 8.5),
-            'park_factor': home_feats.get('park_factor', 9.0),
-            'bullpen_ip_last_3_days_home': home_feats.get('bullpen_ip_last_3_days_home', 0.0),
-            'rolling_avg_adj_hits_away': away_feats.get('rolling_avg_adj_hits_away', 8.0),
-            'rolling_avg_adj_homers_away': away_feats.get('rolling_avg_adj_homers_away', 1.0),
-            'rolling_avg_adj_walks_away': away_feats.get('rolling_avg_adj_walks_away', 3.0),
-            'rolling_avg_adj_strikeouts_away': away_feats.get('rolling_avg_adj_strikeouts_away', 8.0),
-            'starter_rolling_adj_era_away': away_feats.get('starter_rolling_adj_era_away', 4.5),
-            'starter_rolling_whip_away': away_feats.get('starter_rolling_whip_away', 1.3),
-            'starter_rolling_k_per_9_away': away_feats.get('starter_rolling_k_per_9_away', 8.5),
-            'bullpen_ip_last_3_days_away': away_feats.get('bullpen_ip_last_3_days_away', 0.0),
+            'rolling_avg_adj_hits_home': get_feature(home_feats, 'rolling_avg_adj_hits_home', 8.0),
+            'rolling_avg_adj_homers_home': get_feature(home_feats, 'rolling_avg_adj_homers_home', 1.0),
+            'rolling_avg_adj_walks_home': get_feature(home_feats, 'rolling_avg_adj_walks_home', 3.0),
+            'rolling_avg_adj_strikeouts_home': get_feature(home_feats, 'rolling_avg_adj_strikeouts_home', 8.0),
+            'starter_rolling_adj_era_home': get_feature(home_feats, 'starter_rolling_adj_era_home', 4.5),
+            'starter_rolling_whip_home': get_feature(home_feats, 'starter_rolling_whip_home', 1.3),
+            'starter_rolling_k_per_9_home': get_feature(home_feats, 'starter_rolling_k_per_9_home', 8.5),
+            'park_factor': get_feature(home_feats, 'park_factor', 9.0),
+            'bullpen_ip_last_3_days_home': get_feature(home_feats, 'bullpen_ip_last_3_days_home', 0.0),
+            'rolling_avg_adj_hits_away': get_feature(away_feats, 'rolling_avg_adj_hits_away', 8.0),
+            'rolling_avg_adj_homers_away': get_feature(away_feats, 'rolling_avg_adj_homers_away', 1.0),
+            'rolling_avg_adj_walks_away': get_feature(away_feats, 'rolling_avg_adj_walks_away', 3.0),
+            'rolling_avg_adj_strikeouts_away': get_feature(away_feats, 'rolling_avg_adj_strikeouts_away', 8.0),
+            'starter_rolling_adj_era_away': get_feature(away_feats, 'starter_rolling_adj_era_away', 4.5),
+            'starter_rolling_whip_away': get_feature(away_feats, 'starter_rolling_whip_away', 1.3),
+            'starter_rolling_k_per_9_away': get_feature(away_feats, 'starter_rolling_k_per_9_away', 8.5),
+            'bullpen_ip_last_3_days_away': get_feature(away_feats, 'bullpen_ip_last_3_days_away', 0.0),
             'temperature': weather['temperature'],
             'wind_speed': weather['wind_speed'],
-            'humidity': weather['humidity'],
-            'home_days_rest': home_days_rest,
-            'away_days_rest': away_days_rest,
-            'game_of_season': game_of_season,
-            'travel_factor': travel_factor
+            'humidity': weather['humidity']
         }
         
         if home_team_standard == "Minnesota Twins" or away_team_standard == "Minnesota Twins":
@@ -257,12 +216,7 @@ def predict(sport):
             print(pd.Series(home_feats))
             print("\n[2] Raw Away Team Features (from last away game):")
             print(pd.Series(away_feats))
-            print("\n[3] Dynamically Calculated Features:")
-            print(f"  - home_days_rest: {home_days_rest}")
-            print(f"  - away_days_rest: {away_days_rest}")
-            print(f"  - game_of_season: {game_of_season}")
-            print(f"  - travel_factor: {travel_factor}")
-            print("\n[4] Final Features Sent to Model:")
+            print("\n[3] Final Features Sent to Model:")
             print(pd.Series(final_features))
 
     elif sport == "nfl":
@@ -288,13 +242,10 @@ def predict(sport):
         weather = get_weather_for_game(home_city)
 
         final_features = {
-            'rolling_avg_adj_pts_scored_home': home_feats.get('rolling_avg_adj_pts_scored_home', 21.0),
-            'rolling_avg_adj_pts_allowed_home': home_feats.get('rolling_avg_adj_pts_allowed_home', 21.0),
-            'rolling_avg_adj_pts_scored_away': away_feats.get('rolling_avg_adj_pts_scored_away', 21.0),
-            'rolling_avg_adj_pts_allowed_away': away_feats.get('rolling_avg_adj_pts_allowed_away', 21.0),
-            'home_days_rest': (commence_time - pd.to_datetime(home_feats['commence_time'], utc=True)).days,
-            'away_days_rest': (commence_time - pd.to_datetime(away_feats['commence_time'], utc=True)).days,
-            'game_of_season': home_feats.get('game_of_season', 1.0) + 1,
+            'rolling_avg_adj_pts_scored_home': get_feature(home_feats, 'rolling_avg_adj_pts_scored_home', 21.0),
+            'rolling_avg_adj_pts_allowed_home': get_feature(home_feats, 'rolling_avg_adj_pts_allowed_home', 21.0),
+            'rolling_avg_adj_pts_scored_away': get_feature(away_feats, 'rolling_avg_adj_pts_scored_away', 21.0),
+            'rolling_avg_adj_pts_allowed_away': get_feature(away_feats, 'rolling_avg_adj_pts_allowed_away', 21.0),
             'temperature': weather['temperature'],
             'wind_speed': weather['wind_speed'],
             'humidity': weather['humidity']
@@ -313,13 +264,11 @@ def predict(sport):
         raw_prediction = model.predict(prediction_df)[0]
         
         if sport == "mlb" and (home_team_standard == "Minnesota Twins" or away_team_standard == "Minnesota Twins"):
-             print(f"\n[5] Raw Model Prediction: {raw_prediction}")
+             print(f"\n[4] Raw Model Prediction: {raw_prediction}")
              print("--- END TWINS LOG ---\n")
 
         confidence_df = pd.DataFrame([{'raw_prediction': raw_prediction}])
-        # Provide feature names to the calibration model's dataframe to resolve the warning
-        confidence_df.columns = ['raw_prediction']
-        confidence_score = calibration_model.predict_proba(confidence_df)[0][1]
+        confidence_score = calibration_model.predict_proba(confidence_df.values.reshape(-1, 1))[0][1]
 
 
         return jsonify({
