@@ -286,7 +286,6 @@ def predict(sport):
             print(pd.Series(home_feats))
             print("\n[2] Raw Away Team Features (from last away game):")
             print(pd.Series(away_feats))
-            # FIX: Add logging for new features
             print("\n[3] New Feature Check:")
             print(f"  - park_factor: {park_factor}")
             print(f"  - rolling_bullpen_era_home: {get_feature(home_feats, 'rolling_bullpen_era_home', 4.5)}")
