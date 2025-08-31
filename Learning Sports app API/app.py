@@ -157,8 +157,8 @@ def get_games(sport):
     if not ODDS_API_KEY:
         return jsonify({'error': 'Odds API key not configured.'}), 500
     
-    # FIX: Add player_props to the markets to get pitcher data
-    url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds?apiKey={ODDS_API_KEY}&regions=us&markets=totals,spreads,player_props"
+    # FIX: Use the correct market key for pitcher strikeouts
+    url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds?apiKey={ODDS_API_KEY}&regions=us&markets=totals,spreads,pitcher_strikeouts_over_under"
 
     try:
         response = requests.get(url)
@@ -172,7 +172,7 @@ def get_games(sport):
             if datetime.fromisoformat(g['commence_time'].replace('Z', '+00:00')) > now_utc:
                 home_pitcher = "Unknown"
                 away_pitcher = "Unknown"
-                # Find pitchers from the player_props market
+                # Find pitchers from the pitcher_strikeouts_over_under market
                 for bookmaker in g.get('bookmakers', []):
                     for market in bookmaker.get('markets', []):
                         if market['key'] == 'pitcher_strikeouts_over_under':
@@ -238,7 +238,7 @@ def predict(sport):
         home_feats = last_home_game.iloc[-1].to_dict()
         away_feats = last_away_game.iloc[-1].to_dict()
 
-        # FIX: Get individual pitcher stats
+        # Get individual pitcher stats
         home_pitcher_stats = pitcher_features_df[pitcher_features_df['pitcher_name'] == home_pitcher_name]
         away_pitcher_stats = pitcher_features_df[pitcher_features_df['pitcher_name'] == away_pitcher_name]
 
