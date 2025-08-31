@@ -5,11 +5,10 @@ import pandas as pd
 import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import pytz
 import numpy as np
 import warnings
-from bs4 import BeautifulSoup
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -214,8 +213,8 @@ def predict(sport):
     home_pitcher_name = game_data.get('home_pitcher')
     away_pitcher_name = game_data.get('away_pitcher')
     
-    if not all([home_team_full, away_team_full, commence_time_str, home_pitcher_name, away_pitcher_name]):
-        return jsonify({'error': 'Missing team, pitcher, or commence time data in request body.'}), 400
+    if not all([home_team_full, away_team_full, commence_time_str]):
+        return jsonify({'error': 'Missing team or commence time data in request body.'}), 400
     
     commence_time = datetime.fromisoformat(commence_time_str.replace('Z', '+00:00'))
 
@@ -244,10 +243,6 @@ def predict(sport):
 
         home_pitcher_feats = home_pitcher_stats.iloc[0].to_dict() if not home_pitcher_stats.empty else {}
         away_pitcher_feats = away_pitcher_stats.iloc[0].to_dict() if not away_pitcher_stats.empty else {}
-
-
-        home_city = CITY_MAP.get(home_team_standard)
-        weather = get_weather_for_game(home_city)
         
         last_home_game_time = pd.to_datetime(home_feats['commence_time'], utc=True)
         last_away_game_time = pd.to_datetime(away_feats['commence_time'], utc=True)
@@ -305,7 +300,8 @@ def predict(sport):
             'away_days_rest': away_days_rest,
             'game_of_season': game_of_season,
             'travel_factor': travel_factor,
-            'bullpen_era_diff': get_feature(home_feats, 'rolling_bullpen_era_away', 4.5) - get_feature(home_feats, 'rolling_bullpen_era_home', 4.5),
+            'starter_era_diff': get_feature(away_pitcher_feats, 'pitcher_rolling_adj_era', 4.5) - get_feature(home_pitcher_feats, 'pitcher_rolling_adj_era', 4.5),
+            'bullpen_era_diff': get_feature(away_feats, 'rolling_bullpen_era_away', 4.5) - get_feature(home_feats, 'rolling_bullpen_era_home', 4.5),
             'home_offense_vs_away_defense': get_feature(away_feats, 'pitching_rank', 15.5) - get_feature(home_feats, 'hitting_rank', 15.5),
             'away_offense_vs_home_defense': get_feature(home_feats, 'pitching_rank', 15.5) - get_feature(away_feats, 'hitting_rank', 15.5)
         }
