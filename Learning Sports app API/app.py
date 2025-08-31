@@ -279,24 +279,24 @@ def predict(sport):
             'travel_factor': travel_factor
         }
         
-        if home_team_standard == "Minnesota Twins" or away_team_standard == "Minnesota Twins":
-            print("\n--- MINNESOTA TWINS GAME LOG ---")
-            print(f"Game: {away_team_full} at {home_team_full}")
-            print("\n[1] Raw Home Team Features (from last home game):")
-            print(pd.Series(home_feats))
-            print("\n[2] Raw Away Team Features (from last away game):")
-            print(pd.Series(away_feats))
-            print("\n[3] New Feature Check:")
-            print(f"  - park_factor: {park_factor}")
-            print(f"  - rolling_bullpen_era_home: {get_feature(home_feats, 'rolling_bullpen_era_home', 4.5)}")
-            print(f"  - rolling_bullpen_era_away: {get_feature(away_feats, 'rolling_bullpen_era_away', 4.5)}")
-            print("\n[4] Dynamically Calculated Features:")
-            print(f"  - home_days_rest: {home_days_rest}")
-            print(f"  - away_days_rest: {away_days_rest}")
-            print(f"  - game_of_season: {game_of_season}")
-            print(f"  - travel_factor: {travel_factor}")
-            print("\n[5] Final Features Sent to Model:")
-            print(pd.Series(final_features))
+        # FIX: Remove the conditional check to log for ALL teams
+        print("\n--- DETAILED GAME LOG ---")
+        print(f"Game: {away_team_full} at {home_team_full}")
+        print("\n[1] Raw Home Team Features (from last home game):")
+        print(pd.Series(home_feats))
+        print("\n[2] Raw Away Team Features (from last away game):")
+        print(pd.Series(away_feats))
+        print("\n[3] New Feature Check:")
+        print(f"  - park_factor: {park_factor}")
+        print(f"  - rolling_bullpen_era_home: {get_feature(home_feats, 'rolling_bullpen_era_home', 4.5)}")
+        print(f"  - rolling_bullpen_era_away: {get_feature(away_feats, 'rolling_bullpen_era_away', 4.5)}")
+        print("\n[4] Dynamically Calculated Features:")
+        print(f"  - home_days_rest: {home_days_rest}")
+        print(f"  - away_days_rest: {away_days_rest}")
+        print(f"  - game_of_season: {game_of_season}")
+        print(f"  - travel_factor: {travel_factor}")
+        print("\n[5] Final Features Sent to Model:")
+        print(pd.Series(final_features))
 
     elif sport == "nfl":
         # ... (NFL logic remains the same)
@@ -315,9 +315,9 @@ def predict(sport):
 
         raw_prediction = model.predict(prediction_df)[0]
         
-        if sport == "mlb" and (home_team_standard == "Minnesota Twins" or away_team_standard == "Minnesota Twins"):
-             print(f"\n[6] Raw Model Prediction: {raw_prediction}")
-             print("--- END TWINS LOG ---\n")
+        # FIX: Remove the conditional check to log for ALL teams
+        print(f"\n[6] Raw Model Prediction: {raw_prediction}")
+        print("--- END DETAILED LOG ---\n")
 
         confidence_df = pd.DataFrame([{'raw_prediction': raw_prediction}])
         confidence_score = calibration_model.predict_proba(confidence_df.values.reshape(-1, 1))[0][1]
