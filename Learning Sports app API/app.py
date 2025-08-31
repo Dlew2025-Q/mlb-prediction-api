@@ -105,7 +105,6 @@ CITY_TIMEZONE_MAP = {
     "Toronto Blue Jays": "America/New_York", "Washington Nationals": "America/New_York"
 }
 
-# FIX: Add realistic park factors (based on 3-year averages for runs)
 PARK_FACTOR_MAP = {
     "Cincinnati Reds": 1.15, "Colorado Rockies": 1.12, "Kansas City Royals": 1.08, "Boston Red Sox": 1.07,
     "Los Angeles Angels": 1.05, "Chicago White Sox": 1.04, "Atlanta Braves": 1.03, "Texas Rangers": 1.02,
@@ -248,6 +247,8 @@ def predict(sport):
             travel_factor = abs(current_city_tz - previous_city_tz)
         else:
             travel_factor = 0.0
+        
+        park_factor = PARK_FACTOR_MAP.get(home_team_standard, 1.0)
 
         final_features = {
             'rolling_avg_adj_hits_home': get_feature(home_feats, 'rolling_avg_adj_hits_home', 8.0),
@@ -258,7 +259,7 @@ def predict(sport):
             'starter_rolling_whip_home': get_feature(home_feats, 'starter_rolling_whip_home', 1.3),
             'starter_rolling_k_per_9_home': get_feature(home_feats, 'starter_rolling_k_per_9_home', 8.5),
             'rolling_bullpen_era_home': get_feature(home_feats, 'rolling_bullpen_era_home', 4.5),
-            'park_factor': PARK_FACTOR_MAP.get(home_team_standard, 1.0),
+            'park_factor': park_factor,
             'bullpen_ip_last_3_days_home': get_feature(home_feats, 'bullpen_ip_last_3_days_home', 0.0),
             'rolling_avg_adj_hits_away': get_feature(away_feats, 'rolling_avg_adj_hits_away', 8.0),
             'rolling_avg_adj_homers_away': get_feature(away_feats, 'rolling_avg_adj_homers_away', 1.0),
@@ -278,6 +279,26 @@ def predict(sport):
             'travel_factor': travel_factor
         }
         
+        if home_team_standard == "Minnesota Twins" or away_team_standard == "Minnesota Twins":
+            print("\n--- MINNESOTA TWINS GAME LOG ---")
+            print(f"Game: {away_team_full} at {home_team_full}")
+            print("\n[1] Raw Home Team Features (from last home game):")
+            print(pd.Series(home_feats))
+            print("\n[2] Raw Away Team Features (from last away game):")
+            print(pd.Series(away_feats))
+            # FIX: Add logging for new features
+            print("\n[3] New Feature Check:")
+            print(f"  - park_factor: {park_factor}")
+            print(f"  - rolling_bullpen_era_home: {get_feature(home_feats, 'rolling_bullpen_era_home', 4.5)}")
+            print(f"  - rolling_bullpen_era_away: {get_feature(away_feats, 'rolling_bullpen_era_away', 4.5)}")
+            print("\n[4] Dynamically Calculated Features:")
+            print(f"  - home_days_rest: {home_days_rest}")
+            print(f"  - away_days_rest: {away_days_rest}")
+            print(f"  - game_of_season: {game_of_season}")
+            print(f"  - travel_factor: {travel_factor}")
+            print("\n[5] Final Features Sent to Model:")
+            print(pd.Series(final_features))
+
     elif sport == "nfl":
         # ... (NFL logic remains the same)
         return jsonify({'error': 'NFL not yet fully implemented in this version.'}), 501
@@ -295,6 +316,10 @@ def predict(sport):
 
         raw_prediction = model.predict(prediction_df)[0]
         
+        if sport == "mlb" and (home_team_standard == "Minnesota Twins" or away_team_standard == "Minnesota Twins"):
+             print(f"\n[6] Raw Model Prediction: {raw_prediction}")
+             print("--- END TWINS LOG ---\n")
+
         confidence_df = pd.DataFrame([{'raw_prediction': raw_prediction}])
         confidence_score = calibration_model.predict_proba(confidence_df.values.reshape(-1, 1))[0][1]
 
@@ -305,7 +330,7 @@ def predict(sport):
                  market_line_float = float(market_line)
                  edge = raw_prediction - market_line_float
                  
-                 MIN_CONFIDENCE = 0.50  # Increased to 50%
+                 MIN_CONFIDENCE = 0.50
                  MIN_EDGE = 0.5
                  
                  if edge > MIN_EDGE and confidence_score > MIN_CONFIDENCE:
