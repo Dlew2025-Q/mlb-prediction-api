@@ -158,7 +158,7 @@ def get_games(sport):
         return jsonify({'error': 'Odds API key not configured.'}), 500
     
     # FIX: Use the correct market key for pitcher strikeouts
-    url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds?apiKey={ODDS_API_KEY}&regions=us&markets=totals,spreads,pitcher_strikeouts_over_under"
+    url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds?apiKey={ODDS_API_KEY}&regions=us&markets=totals,spreads,pitcher_strikeouts"
 
     try:
         response = requests.get(url)
@@ -172,10 +172,10 @@ def get_games(sport):
             if datetime.fromisoformat(g['commence_time'].replace('Z', '+00:00')) > now_utc:
                 home_pitcher = "Unknown"
                 away_pitcher = "Unknown"
-                # Find pitchers from the pitcher_strikeouts_over_under market
+                # Find pitchers from the pitcher_strikeouts market
                 for bookmaker in g.get('bookmakers', []):
                     for market in bookmaker.get('markets', []):
-                        if market['key'] == 'pitcher_strikeouts_over_under':
+                        if market['key'] == 'pitcher_strikeouts':
                             for outcome in market.get('outcomes', []):
                                 pitcher_name = outcome.get('description')
                                 if g['home_team'] in pitcher_name:
