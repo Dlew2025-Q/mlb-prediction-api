@@ -5,10 +5,11 @@ import pandas as pd
 import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import pytz
 import numpy as np
 import warnings
+from bs4 import BeautifulSoup
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -39,6 +40,7 @@ def load_pickle(path):
 mlb_model = load_pickle('mlb_total_runs_model.pkl')
 mlb_calibration_model = load_pickle('mlb_calibration_model.pkl')
 mlb_features_df = load_pickle('latest_mlb_features.pkl')
+pitcher_features_df = load_pickle('pitcher_features.pkl') # Load new pitcher data
 
 nfl_model = load_pickle('nfl_total_points_model.pkl')
 nfl_calibration_model = load_pickle('nfl_calibration_model.pkl')
@@ -155,18 +157,37 @@ def get_games(sport):
     if not ODDS_API_KEY:
         return jsonify({'error': 'Odds API key not configured.'}), 500
     
-    url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds?apiKey={ODDS_API_KEY}&regions=us&markets=totals,spreads"
+    # FIX: Add player_props to the markets to get pitcher data
+    url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds?apiKey={ODDS_API_KEY}&regions=us&markets=totals,spreads,player_props"
 
     try:
         response = requests.get(url)
         response.raise_for_status()
         games = response.json()
         
-        # Filter for upcoming games
         now_utc = datetime.now(timezone.utc)
-        upcoming_games = [g for g in games if datetime.fromisoformat(g['commence_time'].replace('Z', '+00:00')) > now_utc]
+        upcoming_games_data = []
+
+        for g in games:
+            if datetime.fromisoformat(g['commence_time'].replace('Z', '+00:00')) > now_utc:
+                home_pitcher = "Unknown"
+                away_pitcher = "Unknown"
+                # Find pitchers from the player_props market
+                for bookmaker in g.get('bookmakers', []):
+                    for market in bookmaker.get('markets', []):
+                        if market['key'] == 'pitcher_strikeouts_over_under':
+                            for outcome in market.get('outcomes', []):
+                                pitcher_name = outcome.get('description')
+                                if g['home_team'] in pitcher_name:
+                                    home_pitcher = pitcher_name
+                                elif g['away_team'] in pitcher_name:
+                                    away_pitcher = pitcher_name
+                
+                g['home_pitcher'] = home_pitcher
+                g['away_pitcher'] = away_pitcher
+                upcoming_games_data.append(g)
         
-        return jsonify(upcoming_games)
+        return jsonify(upcoming_games_data)
     except requests.exceptions.RequestException as e:
         return jsonify({'error': f'Failed to fetch data from The Odds API: {e}'}), 502
 
@@ -190,15 +211,17 @@ def predict(sport):
     away_team_full = game_data.get('away_team')
     commence_time_str = game_data.get('commence_time')
     market_line = game_data.get('market_line') 
+    home_pitcher_name = game_data.get('home_pitcher')
+    away_pitcher_name = game_data.get('away_pitcher')
     
-    if not all([home_team_full, away_team_full, commence_time_str]):
-        return jsonify({'error': 'Missing team or commence time data in request body.'}), 400
+    if not all([home_team_full, away_team_full, commence_time_str, home_pitcher_name, away_pitcher_name]):
+        return jsonify({'error': 'Missing team, pitcher, or commence time data in request body.'}), 400
     
     commence_time = datetime.fromisoformat(commence_time_str.replace('Z', '+00:00'))
 
     final_features = {}
     if sport == "mlb":
-        if mlb_model is None or mlb_calibration_model is None or mlb_features_df is None:
+        if mlb_model is None or mlb_calibration_model is None or mlb_features_df is None or pitcher_features_df is None:
             return jsonify({'error': 'MLB model or features not loaded.'}), 503
         
         home_team_standard = MLB_TEAM_NAME_MAP.get(home_team_full, home_team_full)
@@ -214,6 +237,14 @@ def predict(sport):
 
         home_feats = last_home_game.iloc[-1].to_dict()
         away_feats = last_away_game.iloc[-1].to_dict()
+
+        # FIX: Get individual pitcher stats
+        home_pitcher_stats = pitcher_features_df[pitcher_features_df['pitcher_name'] == home_pitcher_name]
+        away_pitcher_stats = pitcher_features_df[pitcher_features_df['pitcher_name'] == away_pitcher_name]
+
+        home_pitcher_feats = home_pitcher_stats.iloc[0].to_dict() if not home_pitcher_stats.empty else {}
+        away_pitcher_feats = away_pitcher_stats.iloc[0].to_dict() if not away_pitcher_stats.empty else {}
+
 
         home_city = CITY_MAP.get(home_team_standard)
         weather = get_weather_for_game(home_city)
@@ -255,9 +286,9 @@ def predict(sport):
             'rolling_avg_adj_homers_home': get_feature(home_feats, 'rolling_avg_adj_homers_home', 1.0),
             'rolling_avg_adj_walks_home': get_feature(home_feats, 'rolling_avg_adj_walks_home', 3.0),
             'rolling_avg_adj_strikeouts_home': get_feature(home_feats, 'rolling_avg_adj_strikeouts_home', 8.0),
-            'starter_rolling_adj_era_home': get_feature(home_feats, 'starter_rolling_adj_era_home', 4.5),
-            'starter_rolling_whip_home': get_feature(home_feats, 'starter_rolling_whip_home', 1.3),
-            'starter_rolling_k_per_9_home': get_feature(home_feats, 'starter_rolling_k_per_9_home', 8.5),
+            'pitcher_rolling_adj_era_home': get_feature(home_pitcher_feats, 'pitcher_rolling_adj_era', 4.5),
+            'pitcher_rolling_whip_home': get_feature(home_pitcher_feats, 'pitcher_rolling_whip', 1.3),
+            'pitcher_rolling_k_per_9_home': get_feature(home_pitcher_feats, 'pitcher_rolling_k_per_9', 8.5),
             'rolling_bullpen_era_home': get_feature(home_feats, 'rolling_bullpen_era_home', 4.5),
             'park_factor': park_factor,
             'bullpen_ip_last_3_days_home': get_feature(home_feats, 'bullpen_ip_last_3_days_home', 0.0),
@@ -265,38 +296,19 @@ def predict(sport):
             'rolling_avg_adj_homers_away': get_feature(away_feats, 'rolling_avg_adj_homers_away', 1.0),
             'rolling_avg_adj_walks_away': get_feature(away_feats, 'rolling_avg_adj_walks_away', 3.0),
             'rolling_avg_adj_strikeouts_away': get_feature(away_feats, 'rolling_avg_adj_strikeouts_away', 8.0),
-            'starter_rolling_adj_era_away': get_feature(away_feats, 'starter_rolling_adj_era_away', 4.5),
-            'starter_rolling_whip_away': get_feature(away_feats, 'starter_rolling_whip_away', 1.3),
-            'starter_rolling_k_per_9_away': get_feature(away_feats, 'starter_rolling_k_per_9_away', 8.5),
+            'pitcher_rolling_adj_era_away': get_feature(away_pitcher_feats, 'pitcher_rolling_adj_era', 4.5),
+            'pitcher_rolling_whip_away': get_feature(away_pitcher_feats, 'pitcher_rolling_whip', 1.3),
+            'pitcher_rolling_k_per_9_away': get_feature(away_pitcher_feats, 'pitcher_rolling_k_per_9', 8.5),
             'rolling_bullpen_era_away': get_feature(away_feats, 'rolling_bullpen_era_away', 4.5),
             'bullpen_ip_last_3_days_away': get_feature(away_feats, 'bullpen_ip_last_3_days_away', 0.0),
-            'temperature': weather['temperature'],
-            'wind_speed': weather['wind_speed'],
-            'humidity': weather['humidity'],
             'home_days_rest': home_days_rest,
             'away_days_rest': away_days_rest,
             'game_of_season': game_of_season,
-            'travel_factor': travel_factor
+            'travel_factor': travel_factor,
+            'bullpen_era_diff': get_feature(home_feats, 'rolling_bullpen_era_away', 4.5) - get_feature(home_feats, 'rolling_bullpen_era_home', 4.5),
+            'home_offense_vs_away_defense': get_feature(away_feats, 'pitching_rank', 15.5) - get_feature(home_feats, 'hitting_rank', 15.5),
+            'away_offense_vs_home_defense': get_feature(home_feats, 'pitching_rank', 15.5) - get_feature(away_feats, 'hitting_rank', 15.5)
         }
-        
-        # FIX: Remove the conditional check to log for ALL teams
-        print("\n--- DETAILED GAME LOG ---")
-        print(f"Game: {away_team_full} at {home_team_full}")
-        print("\n[1] Raw Home Team Features (from last home game):")
-        print(pd.Series(home_feats))
-        print("\n[2] Raw Away Team Features (from last away game):")
-        print(pd.Series(away_feats))
-        print("\n[3] New Feature Check:")
-        print(f"  - park_factor: {park_factor}")
-        print(f"  - rolling_bullpen_era_home: {get_feature(home_feats, 'rolling_bullpen_era_home', 4.5)}")
-        print(f"  - rolling_bullpen_era_away: {get_feature(away_feats, 'rolling_bullpen_era_away', 4.5)}")
-        print("\n[4] Dynamically Calculated Features:")
-        print(f"  - home_days_rest: {home_days_rest}")
-        print(f"  - away_days_rest: {away_days_rest}")
-        print(f"  - game_of_season: {game_of_season}")
-        print(f"  - travel_factor: {travel_factor}")
-        print("\n[5] Final Features Sent to Model:")
-        print(pd.Series(final_features))
 
     elif sport == "nfl":
         # ... (NFL logic remains the same)
@@ -315,10 +327,6 @@ def predict(sport):
 
         raw_prediction = model.predict(prediction_df)[0]
         
-        # FIX: Remove the conditional check to log for ALL teams
-        print(f"\n[6] Raw Model Prediction: {raw_prediction}")
-        print("--- END DETAILED LOG ---\n")
-
         confidence_df = pd.DataFrame([{'raw_prediction': raw_prediction}])
         confidence_score = calibration_model.predict_proba(confidence_df.values.reshape(-1, 1))[0][1]
 
