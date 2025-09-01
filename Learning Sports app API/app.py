@@ -5,11 +5,10 @@ import pandas as pd
 import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import pytz
 import numpy as np
 import warnings
-from bs4 import BeautifulSoup
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -40,6 +39,7 @@ def load_pickle(path):
 mlb_model = load_pickle('mlb_total_runs_model.pkl')
 mlb_calibration_model = load_pickle('mlb_calibration_model.pkl')
 mlb_features_df = load_pickle('latest_mlb_features.pkl')
+pitcher_features_df = load_pickle('pitcher_features.pkl')
 
 nfl_model = load_pickle('nfl_total_points_model.pkl')
 nfl_calibration_model = load_pickle('nfl_calibration_model.pkl')
@@ -82,6 +82,24 @@ MLB_TEAM_NAME_MAP = {
     "METS": "New York Mets", "YANKEES": "New York Yankees", "ATH": "Oakland Athletics", "WSH": "Washington Nationals"
 }
 
+# Add NFL team name map
+NFL_TEAM_NAME_MAP = {
+    "ARI": "Arizona Cardinals", "ATL": "Atlanta Falcons", "BAL": "Baltimore Ravens", "BUF": "Buffalo Bills", "CAR": "Carolina Panthers", "CHI": "Chicago Bears",
+    "CIN": "Cincinnati Bengals", "CLE": "Cleveland Browns", "DAL": "Dallas Cowboys", "DEN": "Denver Broncos", "DET": "Detroit Lions", "GB": "Green Bay Packers",
+    "HOU": "Houston Texans", "IND": "Indianapolis Colts", "JAX": "Jacksonville Jaguars", "KC": "Kansas City Chiefs", "LV": "Las Vegas Raiders", "LAC": "Los Angeles Chargers",
+    "LA": "Los Angeles Rams", "MIA": "Miami Dolphins", "MIN": "Minnesota Vikings", "NE": "New England Patriots", "NO": "New Orleans Saints", "NYG": "New York Giants",
+    "NYJ": "New York Jets", "OAK": "Las Vegas Raiders", "PHI": "Philadelphia Eagles", "PIT": "Pittsburgh Steelers", "SF": "San Francisco 49ers", "SEA": "Seattle Seahawks",
+    "TB": "Tampa Bay Buccaneers", "TEN": "Tennessee Titans", "WAS": "Washington Commanders",
+    # Add full names for consistency
+    "Arizona Cardinals": "Arizona Cardinals", "Atlanta Falcons": "Atlanta Falcons", "Baltimore Ravens": "Baltimore Ravens", "Buffalo Bills": "Buffalo Bills", "Carolina Panthers": "Carolina Panthers", "Chicago Bears": "Chicago Bears",
+    "Cincinnati Bengals": "Cincinnati Bengals", "Cleveland Browns": "Cleveland Browns", "Dallas Cowboys": "Dallas Cowboys", "Denver Broncos": "Denver Broncos", "Detroit Lions": "Detroit Lions", "Green Bay Packers": "Green Bay Packers",
+    "Houston Texans": "Houston Texans", "Indianapolis Colts": "Indianapolis Colts", "Jacksonville Jaguars": "Jacksonville Jaguars", "Kansas City Chiefs": "Kansas City Chiefs", "Las Vegas Raiders": "Las Vegas Raiders", "Los Angeles Chargers": "Los Angeles Chargers",
+    "Los Angeles Rams": "Los Angeles Rams", "Miami Dolphins": "Miami Dolphins", "Minnesota Vikings": "Minnesota Vikings", "New England Patriots": "New England Patriots", "New Orleans Saints": "New Orleans Saints", "New York Giants": "New York Giants",
+    "New York Jets": "New York Jets", "Philadelphia Eagles": "Philadelphia Eagles", "Pittsburgh Steelers": "Pittsburgh Steelers", "San Francisco 49ers": "San Francisco 49ers", "Seattle Seahawks": "Seattle Seahawks",
+    "Tampa Bay Buccaneers": "Tampa Bay Buccaneers", "Tennessee Titans": "Tennessee Titans", "Washington Commanders": "Washington Commanders",
+}
+
+
 # Maps team names to city and state for weather lookup
 CITY_MAP = {
     "Arizona Diamondbacks": "Phoenix,AZ", "Atlanta Braves": "Atlanta,GA", "Baltimore Orioles": "Baltimore,MD", "Boston Red Sox": "Boston,MA",
@@ -91,7 +109,15 @@ CITY_MAP = {
     "Minnesota Twins": "Minneapolis,MN", "New York Mets": "Queens,NY", "New York Yankees": "Bronx,NY", "Oakland Athletics": "Oakland,CA",
     "Philadelphia Phillies": "Philadelphia,PA", "Pittsburgh Pirates": "Pittsburgh,PA", "San Diego Padres": "San Diego,CA",
     "San Francisco Giants": "San Francisco,CA", "Seattle Mariners": "Seattle,WA", "St. Louis Cardinals": "St. Louis,MO",
-    "Tampa Bay Rays": "St. Petersburg,FL", "Texas Rangers": "Arlington,TX", "Toronto Blue Jays": "Toronto,ON", "Washington Nationals": "Washington,DC"
+    "Tampa Bay Rays": "St. Petersburg,FL", "Texas Rangers": "Arlington,TX", "Toronto Blue Jays": "Toronto,ON", "Washington Nationals": "Washington,DC",
+    # NFL Cities
+    "Arizona Cardinals": "Glendale,AZ", "Atlanta Falcons": "Atlanta,GA", "Baltimore Ravens": "Baltimore,MD", "Buffalo Bills": "Orchard Park,NY", "Carolina Panthers": "Charlotte,NC",
+    "Chicago Bears": "Chicago,IL", "Cincinnati Bengals": "Cincinnati,OH", "Cleveland Browns": "Cleveland,OH", "Dallas Cowboys": "Arlington,TX", "Denver Broncos": "Denver,CO",
+    "Detroit Lions": "Detroit,MI", "Green Bay Packers": "Green Bay,WI", "Houston Texans": "Houston,TX", "Indianapolis Colts": "Indianapolis,IN", "Jacksonville Jaguars": "Jacksonville,FL",
+    "Kansas City Chiefs": "Kansas City,MO", "Las Vegas Raiders": "Las Vegas,NV", "Los Angeles Chargers": "Inglewood,CA", "Los Angeles Rams": "Inglewood,CA", "Miami Dolphins": "Miami Gardens,FL",
+    "Minnesota Vikings": "Minneapolis,MN", "New England Patriots": "Foxborough,MA", "New Orleans Saints": "New Orleans,LA", "New York Giants": "East Rutherford,NJ", "New York Jets": "East Rutherford,NJ",
+    "Philadelphia Eagles": "Philadelphia,PA", "Pittsburgh Steelers": "Pittsburgh,PA", "San Francisco 49ers": "Santa Clara,CA", "Seattle Seahawks": "Seattle,WA",
+    "Tampa Bay Buccaneers": "Tampa,FL", "Tennessee Titans": "Nashville,TN", "Washington Commanders": "Landover,MD"
 }
 
 # Maps team names to city timezones for calculating travel factor
@@ -156,7 +182,6 @@ def get_games(sport):
     if not ODDS_API_KEY:
         return jsonify({'error': 'Odds API key not configured.'}), 500
     
-    # FIX: Revert to a valid API call without pitcher props
     url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds?apiKey={ODDS_API_KEY}&regions=us&markets=totals,spreads"
 
     try:
@@ -199,6 +224,7 @@ def predict(sport):
 
     final_features = {}
     if sport == "mlb":
+        # ... (MLB logic remains unchanged)
         if mlb_model is None or mlb_calibration_model is None or mlb_features_df is None:
             return jsonify({'error': 'MLB model or features not loaded.'}), 503
         
@@ -215,6 +241,9 @@ def predict(sport):
 
         home_feats = last_home_game.iloc[-1].to_dict()
         away_feats = last_away_game.iloc[-1].to_dict()
+
+        home_city = CITY_MAP.get(home_team_standard)
+        weather = get_weather_for_game(home_city)
         
         last_home_game_time = pd.to_datetime(home_feats['commence_time'], utc=True)
         last_away_game_time = pd.to_datetime(away_feats['commence_time'], utc=True)
@@ -248,7 +277,6 @@ def predict(sport):
         
         park_factor = PARK_FACTOR_MAP.get(home_team_standard, 1.0)
 
-        # FIX: Revert to team-level starter stats and remove pitcher-specific logic
         final_features = {
             'rolling_avg_adj_hits_home': get_feature(home_feats, 'rolling_avg_adj_hits_home', 8.0),
             'rolling_avg_adj_homers_home': get_feature(home_feats, 'rolling_avg_adj_homers_home', 1.0),
@@ -280,9 +308,39 @@ def predict(sport):
         }
 
     elif sport == "nfl":
-        # ... (NFL logic remains the same)
-        return jsonify({'error': 'NFL not yet fully implemented in this version.'}), 501
+        # FIX: Implement full NFL prediction logic
+        if nfl_model is None or nfl_calibration_model is None or nfl_features_df is None:
+            return jsonify({'error': 'NFL model or features not loaded.'}), 503
 
+        home_team_standard = NFL_TEAM_NAME_MAP.get(home_team_full, home_team_full)
+        away_team_standard = NFL_TEAM_NAME_MAP.get(away_team_full, away_team_full)
+
+        sorted_nfl_features = nfl_features_df.sort_values('commence_time')
+
+        last_home_game = sorted_nfl_features[sorted_nfl_features['home_team'] == home_team_standard]
+        last_away_game = sorted_nfl_features[sorted_nfl_features['away_team'] == away_team_standard]
+
+        if last_home_game.empty or last_away_game.empty:
+            return jsonify({'error': f'No NFL features found for {home_team_full} or {away_team_full} in the loaded features file.'}), 404
+        
+        home_feats = last_home_game.iloc[-1].to_dict()
+        away_feats = last_away_game.iloc[-1].to_dict()
+
+        home_city = CITY_MAP.get(home_team_standard)
+        weather = get_weather_for_game(home_city)
+
+        final_features = {
+            'rolling_avg_adj_pts_scored_home': get_feature(home_feats, 'rolling_avg_adj_pts_scored_home', 21.0),
+            'rolling_avg_adj_pts_allowed_home': get_feature(home_feats, 'rolling_avg_adj_pts_allowed_home', 21.0),
+            'rolling_avg_adj_pts_scored_away': get_feature(away_feats, 'rolling_avg_adj_pts_scored_away', 21.0),
+            'rolling_avg_adj_pts_allowed_away': get_feature(away_feats, 'rolling_avg_adj_pts_allowed_away', 21.0),
+            'home_days_rest': (commence_time - pd.to_datetime(home_feats['commence_time'], utc=True)).days,
+            'away_days_rest': (commence_time - pd.to_datetime(away_feats['commence_time'], utc=True)).days,
+            'game_of_season': home_feats.get('game_of_season', 1.0) + 1,
+            'temperature': weather['temperature'],
+            'wind_speed': weather['wind_speed'],
+            'humidity': weather['humidity']
+        }
     else:
         return jsonify({'error': 'Invalid sport specified. Must be "mlb" or "nfl".'}), 400
 
