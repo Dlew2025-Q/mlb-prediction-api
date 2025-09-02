@@ -224,7 +224,6 @@ def predict(sport):
 
     final_features = {}
     if sport == "mlb":
-        # ... (MLB logic remains unchanged)
         if mlb_model is None or mlb_calibration_model is None or mlb_features_df is None:
             return jsonify({'error': 'MLB model or features not loaded.'}), 503
         
@@ -243,7 +242,6 @@ def predict(sport):
         away_feats = last_away_game.iloc[-1].to_dict()
 
         home_city = CITY_MAP.get(home_team_standard)
-        weather = get_weather_for_game(home_city)
         
         last_home_game_time = pd.to_datetime(home_feats['commence_time'], utc=True)
         last_away_game_time = pd.to_datetime(away_feats['commence_time'], utc=True)
@@ -304,11 +302,16 @@ def predict(sport):
             'starter_era_diff': get_feature(away_feats, 'starter_rolling_adj_era_away', 4.5) - get_feature(home_feats, 'starter_rolling_adj_era_home', 4.5),
             'bullpen_era_diff': get_feature(away_feats, 'rolling_bullpen_era_away', 4.5) - get_feature(home_feats, 'rolling_bullpen_era_home', 4.5),
             'home_offense_vs_away_defense': get_feature(away_feats, 'pitching_rank', 15.5) - get_feature(home_feats, 'hitting_rank', 15.5),
-            'away_offense_vs_home_defense': get_feature(home_feats, 'pitching_rank', 15.5) - get_feature(away_feats, 'hitting_rank', 15.5)
+            'away_offense_vs_home_defense': get_feature(home_feats, 'pitching_rank', 15.5) - get_feature(away_feats, 'hitting_rank', 15.5),
+            'starter_rolling_k_bb_home': get_feature(home_feats, 'starter_rolling_k_bb_home', 2.5),
+            'starter_rolling_k_bb_away': get_feature(away_feats, 'starter_rolling_k_bb_away', 2.5),
+            'rolling_batter_k_bb_home': get_feature(home_feats, 'rolling_batter_k_bb_home', 2.5),
+            'rolling_batter_k_bb_away': get_feature(away_feats, 'rolling_batter_k_bb_away', 2.5),
+            'hot_bats_vs_sharp_pitching_home': get_feature(home_feats, 'hot_bats_vs_sharp_pitching_home', 0),
+            'hot_bats_vs_sharp_pitching_away': get_feature(away_feats, 'hot_bats_vs_sharp_pitching_away', 0)
         }
 
     elif sport == "nfl":
-        # FIX: Implement full NFL prediction logic
         if nfl_model is None or nfl_calibration_model is None or nfl_features_df is None:
             return jsonify({'error': 'NFL model or features not loaded.'}), 503
 
@@ -364,12 +367,13 @@ def predict(sport):
                  market_line_float = float(market_line)
                  edge = raw_prediction - market_line_float
                  
-                 MIN_CONFIDENCE = 0.50
-                 MIN_EDGE = 0.5
+                 # Define sport-specific thresholds
+                 min_confidence = 0.25
+                 min_edge = 1.5 if sport == 'nfl' else 0.5
                  
-                 if edge > MIN_EDGE and confidence_score > MIN_CONFIDENCE:
+                 if edge > min_edge and confidence_score > min_confidence:
                      suggestion = "Over"
-                 elif edge < -MIN_EDGE and confidence_score > MIN_CONFIDENCE:
+                 elif edge < -min_edge and confidence_score > min_confidence:
                      suggestion = "Under"
             except (ValueError, TypeError):
                 pass
