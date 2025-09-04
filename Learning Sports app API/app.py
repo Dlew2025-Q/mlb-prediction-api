@@ -39,6 +39,7 @@ def load_pickle(path):
 mlb_model = load_pickle('mlb_total_runs_model.pkl')
 mlb_calibration_model = load_pickle('mlb_calibration_model.pkl')
 mlb_features_df = load_pickle('latest_mlb_features.pkl')
+pitcher_features_df = load_pickle('pitcher_features.pkl')
 
 nfl_model = load_pickle('nfl_total_points_model.pkl')
 nfl_calibration_model = load_pickle('nfl_calibration_model.pkl')
@@ -274,7 +275,6 @@ def predict(sport):
         
         park_factor = PARK_FACTOR_MAP.get(home_team_standard, 1.0)
 
-        # FIX: Update the feature set to match the retrained model
         final_features = {
             'rolling_avg_adj_hits_home': get_feature(home_feats, 'rolling_avg_adj_hits_home', 8.0),
             'rolling_avg_adj_homers_home': get_feature(home_feats, 'rolling_avg_adj_homers_home', 1.0),
@@ -302,7 +302,13 @@ def predict(sport):
             'starter_era_diff': get_feature(away_feats, 'starter_rolling_adj_era_away', 4.5) - get_feature(home_feats, 'starter_rolling_adj_era_home', 4.5),
             'bullpen_era_diff': get_feature(away_feats, 'rolling_bullpen_era_away', 4.5) - get_feature(home_feats, 'rolling_bullpen_era_home', 4.5),
             'home_offense_vs_away_defense': get_feature(away_feats, 'pitching_rank', 15.5) - get_feature(home_feats, 'hitting_rank', 15.5),
-            'away_offense_vs_home_defense': get_feature(home_feats, 'pitching_rank', 15.5) - get_feature(away_feats, 'hitting_rank', 15.5)
+            'away_offense_vs_home_defense': get_feature(home_feats, 'pitching_rank', 15.5) - get_feature(away_feats, 'hitting_rank', 15.5),
+            'starter_rolling_k_bb_home': get_feature(home_feats, 'starter_rolling_k_bb_home', 2.5),
+            'starter_rolling_k_bb_away': get_feature(away_feats, 'starter_rolling_k_bb_away', 2.5),
+            'rolling_batter_k_bb_home': get_feature(home_feats, 'rolling_batter_k_bb_home', 2.5),
+            'rolling_batter_k_bb_away': get_feature(away_feats, 'rolling_batter_k_bb_away', 2.5),
+            'hot_bats_vs_sharp_pitching_home': get_feature(home_feats, 'hot_bats_vs_sharp_pitching_home', 0),
+            'hot_bats_vs_sharp_pitching_away': get_feature(away_feats, 'hot_bats_vs_sharp_pitching_away', 0)
         }
 
     elif sport == "nfl":
@@ -361,9 +367,9 @@ def predict(sport):
                  market_line_float = float(market_line)
                  edge = raw_prediction - market_line_float
                  
-                 # Define sport-specific thresholds
-                 min_confidence = 0.15 
-                 min_edge = 1.0 if sport == 'nfl' else 0.25
+                 # FIX: Implement the "Alpha Strategy" thresholds
+                 min_confidence = 0.35
+                 min_edge = 1.5
                  
                  if edge > min_edge and confidence_score > min_confidence:
                      suggestion = "Over"
