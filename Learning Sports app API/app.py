@@ -302,13 +302,7 @@ def predict(sport):
             'starter_era_diff': get_feature(away_feats, 'starter_rolling_adj_era_away', 4.5) - get_feature(home_feats, 'starter_rolling_adj_era_home', 4.5),
             'bullpen_era_diff': get_feature(away_feats, 'rolling_bullpen_era_away', 4.5) - get_feature(home_feats, 'rolling_bullpen_era_home', 4.5),
             'home_offense_vs_away_defense': get_feature(away_feats, 'pitching_rank', 15.5) - get_feature(home_feats, 'hitting_rank', 15.5),
-            'away_offense_vs_home_defense': get_feature(home_feats, 'pitching_rank', 15.5) - get_feature(away_feats, 'hitting_rank', 15.5),
-            'starter_rolling_k_bb_home': get_feature(home_feats, 'starter_rolling_k_bb_home', 2.5),
-            'starter_rolling_k_bb_away': get_feature(away_feats, 'starter_rolling_k_bb_away', 2.5),
-            'rolling_batter_k_bb_home': get_feature(home_feats, 'rolling_batter_k_bb_home', 2.5),
-            'rolling_batter_k_bb_away': get_feature(away_feats, 'rolling_batter_k_bb_away', 2.5),
-            'hot_bats_vs_sharp_pitching_home': get_feature(home_feats, 'hot_bats_vs_sharp_pitching_home', 0),
-            'hot_bats_vs_sharp_pitching_away': get_feature(away_feats, 'hot_bats_vs_sharp_pitching_away', 0)
+            'away_offense_vs_home_defense': get_feature(home_feats, 'pitching_rank', 15.5) - get_feature(away_feats, 'hitting_rank', 15.5)
         }
 
     elif sport == "nfl":
@@ -367,7 +361,7 @@ def predict(sport):
                  market_line_float = float(market_line)
                  edge = raw_prediction - market_line_float
                  
-                 # FIX: Implement the "Alpha Strategy" thresholds
+                 # FIX: Implement the "Alpha Strategy" thresholds from the analysis
                  min_confidence = 0.35
                  min_edge = 1.5
                  
