@@ -39,6 +39,7 @@ def load_pickle(path):
 mlb_model = load_pickle('mlb_total_runs_model.pkl')
 mlb_calibration_model = load_pickle('mlb_calibration_model.pkl')
 mlb_features_df = load_pickle('latest_mlb_features.pkl')
+pitcher_features_df = load_pickle('pitcher_features.pkl')
 
 nfl_model = load_pickle('nfl_total_points_model.pkl')
 nfl_calibration_model = load_pickle('nfl_calibration_model.pkl')
@@ -227,7 +228,7 @@ def predict(sport):
             return jsonify({'error': 'MLB model or features not loaded.'}), 503
         
         home_team_standard = MLB_TEAM_NAME_MAP.get(home_team_full, home_team_full)
-        away_team_standard = MLB_TEAM_NAME_MAP.get(away_team_full, away_team_standard)
+        away_team_standard = MLB_TEAM_NAME_MAP.get(away_team_full, away_team_full)
 
         sorted_mlb_features = mlb_features_df.sort_values('commence_time')
 
@@ -360,7 +361,6 @@ def predict(sport):
                  market_line_float = float(market_line)
                  edge = raw_prediction - market_line_float
                  
-                 # FIX: Implement the "Alpha Strategy" thresholds from the analysis
                  min_confidence = 0.35
                  min_edge = 1.5
                  
