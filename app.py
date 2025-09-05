@@ -362,9 +362,8 @@ def predict(sport):
                  market_line_float = float(market_line)
                  edge = raw_prediction - market_line_float
                  
-                 # Implement the "Alpha Strategy" thresholds from the analysis
-                 min_confidence = 0.35
-                 min_edge = 1.5
+                 min_confidence = 0.25
+                 min_edge = 1.5 if sport == 'nfl' else 0.5
                  
                  if edge > min_edge and confidence_score > min_confidence:
                      suggestion = "Over"
