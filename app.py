@@ -39,6 +39,8 @@ def load_pickle(path):
 mlb_model = load_pickle('mlb_total_runs_model.pkl')
 mlb_calibration_model = load_pickle('mlb_calibration_model.pkl')
 mlb_features_df = load_pickle('latest_mlb_features.pkl')
+# FIX: Add the missing line to load pitcher_features.pkl
+pitcher_features_df = load_pickle('pitcher_features.pkl')
 
 nfl_model = load_pickle('nfl_total_points_model.pkl')
 nfl_calibration_model = load_pickle('nfl_calibration_model.pkl')
@@ -223,7 +225,7 @@ def predict(sport):
 
     final_features = {}
     if sport == "mlb":
-        if mlb_model is None or mlb_calibration_model is None or mlb_features_df is None:
+        if mlb_model is None or mlb_calibration_model is None or mlb_features_df is None or pitcher_features_df is None:
             return jsonify({'error': 'MLB model or features not loaded.'}), 503
         
         home_team_standard = MLB_TEAM_NAME_MAP.get(home_team_full, home_team_full)
@@ -274,7 +276,6 @@ def predict(sport):
         
         park_factor = PARK_FACTOR_MAP.get(home_team_standard, 1.0)
 
-        # FIX: Update feature set to match the retrained model
         final_features = {
             'rolling_avg_adj_hits_home': get_feature(home_feats, 'rolling_avg_adj_hits_home', 8.0),
             'rolling_avg_adj_homers_home': get_feature(home_feats, 'rolling_avg_adj_homers_home', 1.0),
