@@ -167,6 +167,7 @@ def precompute_mlb_features(engine):
         starters_df['adj_earned_runs'] = starters_df['earned_runs'] * (1 + (15.5 - starters_df['hitting_rank']) / 100)
         
         starters_df['whip_numerator'] = starters_df['walks'] + starters_df['hits_allowed']
+        # FIX: Calculate individual pitcher stats
         starters_df['pitcher_rolling_adj_era'] = starters_df.groupby('pitcher_name')['adj_earned_runs'].transform(lambda x: x.shift(1).rolling(5, min_periods=1).sum()) / (starters_df.groupby('pitcher_name')['innings_pitched'].transform(lambda x: x.shift(1).rolling(5, min_periods=1).sum()) + 1e-6) * 9
         starters_df['pitcher_rolling_whip'] = starters_df.groupby('pitcher_name')['whip_numerator'].transform(lambda x: x.shift(1).rolling(5, min_periods=1).sum()) / (starters_df.groupby('pitcher_name')['innings_pitched'].transform(lambda x: x.shift(1).rolling(5, min_periods=1).sum()) + 1e-6)
         starters_df['pitcher_rolling_k_per_9'] = starters_df.groupby('pitcher_name')['strikeouts'].transform(lambda x: x.shift(1).rolling(5, min_periods=1).sum()) / (starters_df.groupby('pitcher_name')['innings_pitched'].transform(lambda x: x.shift(1).rolling(5, min_periods=1).sum()) + 1e-6) * 9

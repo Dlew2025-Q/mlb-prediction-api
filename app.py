@@ -39,7 +39,6 @@ def load_pickle(path):
 mlb_model = load_pickle('mlb_total_runs_model.pkl')
 mlb_calibration_model = load_pickle('mlb_calibration_model.pkl')
 mlb_features_df = load_pickle('latest_mlb_features.pkl')
-pitcher_features_df = load_pickle('pitcher_features.pkl') # Load new pitcher data
 
 nfl_model = load_pickle('nfl_total_points_model.pkl')
 nfl_calibration_model = load_pickle('nfl_calibration_model.pkl')
@@ -278,9 +277,9 @@ def predict(sport):
             'rolling_avg_adj_homers_home': get_feature(home_feats, 'rolling_avg_adj_homers_home', 1.0),
             'rolling_avg_adj_walks_home': get_feature(home_feats, 'rolling_avg_adj_walks_home', 3.0),
             'rolling_avg_adj_strikeouts_home': get_feature(home_feats, 'rolling_avg_adj_strikeouts_home', 8.0),
-            'starter_rolling_adj_era_home': get_feature(home_feats, 'starter_rolling_adj_era_home', 4.5),
-            'starter_rolling_whip_home': get_feature(home_feats, 'starter_rolling_whip_home', 1.3),
-            'starter_rolling_k_per_9_home': get_feature(home_feats, 'starter_rolling_k_per_9_home', 8.5),
+            'pitcher_rolling_adj_era_home': get_feature(home_feats, 'pitcher_rolling_adj_era_home', 4.5),
+            'pitcher_rolling_whip_home': get_feature(home_feats, 'pitcher_rolling_whip_home', 1.3),
+            'pitcher_rolling_k_per_9_home': get_feature(home_feats, 'pitcher_rolling_k_per_9_home', 8.5),
             'rolling_bullpen_era_home': get_feature(home_feats, 'rolling_bullpen_era_home', 4.5),
             'park_factor': park_factor,
             'bullpen_ip_last_3_days_home': get_feature(home_feats, 'bullpen_ip_last_3_days_home', 0.0),
@@ -288,16 +287,16 @@ def predict(sport):
             'rolling_avg_adj_homers_away': get_feature(away_feats, 'rolling_avg_adj_homers_away', 1.0),
             'rolling_avg_adj_walks_away': get_feature(away_feats, 'rolling_avg_adj_walks_away', 3.0),
             'rolling_avg_adj_strikeouts_away': get_feature(away_feats, 'rolling_avg_adj_strikeouts_away', 8.0),
-            'starter_rolling_adj_era_away': get_feature(away_feats, 'starter_rolling_adj_era_away', 4.5),
-            'starter_rolling_whip_away': get_feature(away_feats, 'starter_rolling_whip_away', 1.3),
-            'starter_rolling_k_per_9_away': get_feature(away_feats, 'starter_rolling_k_per_9_away', 8.5),
+            'pitcher_rolling_adj_era_away': get_feature(away_feats, 'pitcher_rolling_adj_era_away', 4.5),
+            'pitcher_rolling_whip_away': get_feature(away_feats, 'pitcher_rolling_whip_away', 1.3),
+            'pitcher_rolling_k_per_9_away': get_feature(away_feats, 'pitcher_rolling_k_per_9_away', 8.5),
             'rolling_bullpen_era_away': get_feature(away_feats, 'rolling_bullpen_era_away', 4.5),
             'bullpen_ip_last_3_days_away': get_feature(away_feats, 'bullpen_ip_last_3_days_away', 0.0),
             'home_days_rest': home_days_rest,
             'away_days_rest': away_days_rest,
             'game_of_season': game_of_season,
             'travel_factor': travel_factor,
-            'starter_era_diff': get_feature(away_feats, 'starter_rolling_adj_era_away', 4.5) - get_feature(home_feats, 'starter_rolling_adj_era_home', 4.5),
+            'starter_era_diff': get_feature(home_feats, 'pitcher_rolling_adj_era_away', 4.5) - get_feature(home_feats, 'pitcher_rolling_adj_era_home', 4.5),
             'bullpen_era_diff': get_feature(away_feats, 'rolling_bullpen_era_away', 4.5) - get_feature(home_feats, 'rolling_bullpen_era_home', 4.5),
             'home_offense_vs_away_defense': get_feature(away_feats, 'pitching_rank', 15.5) - get_feature(home_feats, 'hitting_rank', 15.5),
             'away_offense_vs_home_defense': get_feature(home_feats, 'pitching_rank', 15.5) - get_feature(away_feats, 'hitting_rank', 15.5)
