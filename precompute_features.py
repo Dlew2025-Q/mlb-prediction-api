@@ -159,7 +159,6 @@ def precompute_mlb_features(engine):
         bullpen_agg = pd.merge(bullpen_agg, bullpen_game_stats[['game_id', 'team', 'rolling_bullpen_era']], on=['game_id', 'team'], how='left')
 
 
-        # Calculate stats for each individual pitcher
         starters_df = pitcher_stats_df_temp[pitcher_stats_df_temp['innings_pitched'] >= 3.0].copy()
         starters_df = pd.merge(starters_df, games_df[['game_id', 'home_team', 'away_team']], on='game_id', how='left')
         starters_df['opponent_team'] = starters_df.apply(lambda row: row['home_team'] if row['team'] == row['away_team'] else row['away_team'], axis=1)
@@ -168,17 +167,11 @@ def precompute_mlb_features(engine):
         starters_df['adj_earned_runs'] = starters_df['earned_runs'] * (1 + (15.5 - starters_df['hitting_rank']) / 100)
         
         starters_df['whip_numerator'] = starters_df['walks'] + starters_df['hits_allowed']
-        # Group by individual pitcher to get their rolling stats
         starters_df['pitcher_rolling_adj_era'] = starters_df.groupby('pitcher_name')['adj_earned_runs'].transform(lambda x: x.shift(1).rolling(5, min_periods=1).sum()) / (starters_df.groupby('pitcher_name')['innings_pitched'].transform(lambda x: x.shift(1).rolling(5, min_periods=1).sum()) + 1e-6) * 9
         starters_df['pitcher_rolling_whip'] = starters_df.groupby('pitcher_name')['whip_numerator'].transform(lambda x: x.shift(1).rolling(5, min_periods=1).sum()) / (starters_df.groupby('pitcher_name')['innings_pitched'].transform(lambda x: x.shift(1).rolling(5, min_periods=1).sum()) + 1e-6)
         starters_df['pitcher_rolling_k_per_9'] = starters_df.groupby('pitcher_name')['strikeouts'].transform(lambda x: x.shift(1).rolling(5, min_periods=1).sum()) / (starters_df.groupby('pitcher_name')['innings_pitched'].transform(lambda x: x.shift(1).rolling(5, min_periods=1).sum()) + 1e-6) * 9
         
-        # Create a clean pitcher features file
-        pitcher_features = starters_df.groupby(['pitcher_name', 'team']).last().reset_index()
-        with open('pitcher_features.pkl', 'wb') as f:
-            pickle.dump(pitcher_features, f)
-        print("\nSuccessfully created pitcher_features.pkl")
-
+        starters_agg = starters_df.groupby(['game_id', 'team']).last().reset_index()
 
         opponent_map = pd.concat([
             games_df[['game_id', 'home_team', 'away_team']].rename(columns={'home_team': 'team', 'away_team': 'opponent'}),
@@ -222,6 +215,15 @@ def precompute_mlb_features(engine):
         mlb_final_df['bullpen_ip_last_3_days_away'].fillna(0, inplace=True)
         mlb_final_df['rolling_bullpen_era_home'].fillna(4.5, inplace=True)
         mlb_final_df['rolling_bullpen_era_away'].fillna(4.5, inplace=True)
+        
+        # FIX: Merge the individual pitcher stats into the main dataframe
+        starters_in_games = starters_df[['game_id', 'team', 'pitcher_name', 'pitcher_rolling_adj_era', 'pitcher_rolling_whip', 'pitcher_rolling_k_per_9']]
+        home_starters = starters_in_games.rename(columns={'team': 'home_team', 'pitcher_rolling_adj_era': 'pitcher_rolling_adj_era_home', 'pitcher_rolling_whip': 'pitcher_rolling_whip_home', 'pitcher_rolling_k_per_9': 'pitcher_rolling_k_per_9_home'})
+        away_starters = starters_in_games.rename(columns={'team': 'away_team', 'pitcher_rolling_adj_era': 'pitcher_rolling_adj_era_away', 'pitcher_rolling_whip': 'pitcher_rolling_whip_away', 'pitcher_rolling_k_per_9': 'pitcher_rolling_k_per_9_away'})
+
+        mlb_final_df = pd.merge(mlb_final_df, home_starters[['game_id', 'pitcher_rolling_adj_era_home', 'pitcher_rolling_whip_home', 'pitcher_rolling_k_per_9_home']], on='game_id', how='left')
+        mlb_final_df = pd.merge(mlb_final_df, away_starters[['game_id', 'pitcher_rolling_adj_era_away', 'pitcher_rolling_whip_away', 'pitcher_rolling_k_per_9_away']], on='game_id', how='left')
+
         
         home_batter_rolling = batter_agg[batter_agg['location'] == 'Home'].copy().rename(columns={
             'rolling_avg_adj_hits_loc': 'rolling_avg_adj_hits_home',
@@ -286,20 +288,11 @@ def precompute_mlb_features(engine):
         mlb_final_df = pd.merge(mlb_final_df, team_pitching_agg[['team', 'pitching_rank']].rename(columns={'team': 'home_team', 'pitching_rank': 'home_pitching_rank'}), on='home_team', how='left')
         mlb_final_df = pd.merge(mlb_final_df, team_hitting_agg[['team', 'hitting_rank']].rename(columns={'team': 'away_team', 'hitting_rank': 'away_hitting_rank'}), on='away_team', how='left')
         mlb_final_df = pd.merge(mlb_final_df, team_pitching_agg[['team', 'pitching_rank']].rename(columns={'team': 'away_team', 'pitching_rank': 'away_pitching_rank'}), on='away_team', how='left')
-        
-        # Merge individual pitcher stats into the training data
-        starters_in_games = starters_df[['game_id', 'team', 'pitcher_name', 'pitcher_rolling_adj_era', 'pitcher_rolling_whip', 'pitcher_rolling_k_per_9']]
-        home_starters = starters_in_games.rename(columns={'team': 'home_team', 'pitcher_rolling_adj_era': 'pitcher_rolling_adj_era_home', 'pitcher_rolling_whip': 'pitcher_rolling_whip_home', 'pitcher_rolling_k_per_9': 'pitcher_rolling_k_per_9_home'})
-        away_starters = starters_in_games.rename(columns={'team': 'away_team', 'pitcher_rolling_adj_era': 'pitcher_rolling_adj_era_away', 'pitcher_rolling_whip': 'pitcher_rolling_whip_away', 'pitcher_rolling_k_per_9': 'pitcher_rolling_k_per_9_away'})
-
-        mlb_final_df = pd.merge(mlb_final_df, home_starters[['game_id', 'pitcher_rolling_adj_era_home', 'pitcher_rolling_whip_home', 'pitcher_rolling_k_per_9_home']], on='game_id', how='left')
-        mlb_final_df = pd.merge(mlb_final_df, away_starters[['game_id', 'pitcher_rolling_adj_era_away', 'pitcher_rolling_whip_away', 'pitcher_rolling_k_per_9_away']], on='game_id', how='left')
 
         mlb_final_df['starter_era_diff'] = mlb_final_df['pitcher_rolling_adj_era_away'] - mlb_final_df['pitcher_rolling_adj_era_home']
         mlb_final_df['bullpen_era_diff'] = mlb_final_df['rolling_bullpen_era_away'] - mlb_final_df['rolling_bullpen_era_home']
         mlb_final_df['home_offense_vs_away_defense'] = mlb_final_df['away_pitching_rank'] - mlb_final_df['home_hitting_rank']
         mlb_final_df['away_offense_vs_home_defense'] = mlb_final_df['home_pitching_rank'] - mlb_final_df['away_hitting_rank']
-
 
         print(f"Final MLB training DataFrame columns: {mlb_final_df.columns.tolist()}")
 
@@ -324,7 +317,7 @@ def precompute_mlb_features(engine):
             'rolling_bullpen_era_away', 'bullpen_ip_last_3_days_away',
             'home_days_rest', 'away_days_rest',
             'game_of_season', 'travel_factor',
-            'bullpen_era_diff', 
+            'starter_era_diff', 'bullpen_era_diff', 
             'home_offense_vs_away_defense', 'away_offense_vs_home_defense'
         ]
         
