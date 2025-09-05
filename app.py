@@ -10,6 +10,19 @@ import pytz
 import numpy as np
 import warnings
 
+# --- DIAGNOSTIC LOGGING ---
+print("--- Starting Application ---")
+try:
+    cwd = os.getcwd()
+    print(f"Current Working Directory: {cwd}")
+    print("Files in Current Directory:")
+    for item in os.listdir(cwd):
+        print(f"- {item}")
+except Exception as e:
+    print(f"Error during diagnostic logging: {e}")
+print("--------------------------")
+
+
 # Initialize the Flask application
 app = Flask(__name__)
 # Enable Cross-Origin Resource Sharing (CORS) to allow requests from different domains
@@ -39,7 +52,6 @@ def load_pickle(path):
 mlb_model = load_pickle('mlb_total_runs_model.pkl')
 mlb_calibration_model = load_pickle('mlb_calibration_model.pkl')
 mlb_features_df = load_pickle('latest_mlb_features.pkl')
-# FIX: Add the missing line to load pitcher_features.pkl
 pitcher_features_df = load_pickle('pitcher_features.pkl')
 
 nfl_model = load_pickle('nfl_total_points_model.pkl')
@@ -229,7 +241,7 @@ def predict(sport):
             return jsonify({'error': 'MLB model or features not loaded.'}), 503
         
         home_team_standard = MLB_TEAM_NAME_MAP.get(home_team_full, home_team_full)
-        away_team_standard = MLB_TEAM_NAME_MAP.get(away_team_full, away_team_full)
+        away_team_standard = MLB_TEAM_NAME_MAP.get(away_team_full, away_team_standard)
 
         sorted_mlb_features = mlb_features_df.sort_values('commence_time')
 
@@ -362,7 +374,7 @@ def predict(sport):
                  market_line_float = float(market_line)
                  edge = raw_prediction - market_line_float
                  
-                 # Implement the "Alpha Strategy" thresholds from the analysis
+                 # FIX: Implement the "Alpha Strategy" thresholds from the analysis
                  min_confidence = 0.35
                  min_edge = 1.5
                  
