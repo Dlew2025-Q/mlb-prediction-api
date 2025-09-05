@@ -52,7 +52,6 @@ def load_pickle(path):
 mlb_model = load_pickle('mlb_total_runs_model.pkl')
 mlb_calibration_model = load_pickle('mlb_calibration_model.pkl')
 mlb_features_df = load_pickle('latest_mlb_features.pkl')
-pitcher_features_df = load_pickle('pitcher_features.pkl')
 
 nfl_model = load_pickle('nfl_total_points_model.pkl')
 nfl_calibration_model = load_pickle('nfl_calibration_model.pkl')
@@ -237,7 +236,7 @@ def predict(sport):
 
     final_features = {}
     if sport == "mlb":
-        if mlb_model is None or mlb_calibration_model is None or mlb_features_df is None:
+        if mlb_model is None or mlb_calibration_model is None or mlb_features_df is None or pitcher_features_df is None:
             return jsonify({'error': 'MLB model or features not loaded.'}), 503
         
         home_team_standard = MLB_TEAM_NAME_MAP.get(home_team_full, home_team_full)
@@ -323,7 +322,7 @@ def predict(sport):
             return jsonify({'error': 'NFL model or features not loaded.'}), 503
 
         home_team_standard = NFL_TEAM_NAME_MAP.get(home_team_full, home_team_full)
-        away_team_standard = NFL_TEAM_NAME_MAP.get(away_team_full, away_team_full)
+        away_team_standard = NFL_TEAM_NAME_MAP.get(away_team_full, away_team_standard)
 
         sorted_nfl_features = nfl_features_df.sort_values('commence_time')
 
