@@ -1,0 +1,12 @@
+pandas
+sqlalchemy
+psycopg2-binary
+scikit-learn
+xgboost
+python-dotenv
+requests
+gunicorn
+flask
+flask-cors
+pybaseball
+
