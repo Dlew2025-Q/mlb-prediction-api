@@ -39,7 +39,6 @@ def load_pickle(path):
 mlb_model = load_pickle('mlb_total_runs_model.pkl')
 mlb_calibration_model = load_pickle('mlb_calibration_model.pkl')
 mlb_features_df = load_pickle('latest_mlb_features.pkl')
-pitcher_features_df = load_pickle('pitcher_features.pkl')
 
 nfl_model = load_pickle('nfl_total_points_model.pkl')
 nfl_calibration_model = load_pickle('nfl_calibration_model.pkl')
@@ -275,6 +274,7 @@ def predict(sport):
         
         park_factor = PARK_FACTOR_MAP.get(home_team_standard, 1.0)
 
+        # FIX: Update feature set to match the retrained model
         final_features = {
             'rolling_avg_adj_hits_home': get_feature(home_feats, 'rolling_avg_adj_hits_home', 8.0),
             'rolling_avg_adj_homers_home': get_feature(home_feats, 'rolling_avg_adj_homers_home', 1.0),
@@ -361,7 +361,7 @@ def predict(sport):
                  market_line_float = float(market_line)
                  edge = raw_prediction - market_line_float
                  
-                 # FIX: Implement the "Alpha Strategy" thresholds from the analysis
+                 # FIX: Implement the "Alpha Strategy" thresholds
                  min_confidence = 0.35
                  min_edge = 1.5
                  
