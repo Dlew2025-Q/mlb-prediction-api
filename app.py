@@ -226,7 +226,6 @@ def predict(sport):
         if mlb_model is None or mlb_calibration_model is None or mlb_features_df is None:
             return jsonify({'error': 'MLB model or features not loaded.'}), 503
         
-        # FIX: Correct the circular reference by providing the original name as the default
         home_team_standard = MLB_TEAM_NAME_MAP.get(home_team_full, home_team_full)
         away_team_standard = MLB_TEAM_NAME_MAP.get(away_team_full, away_team_full)
 
@@ -241,6 +240,14 @@ def predict(sport):
         home_feats = last_home_game.iloc[-1].to_dict()
         away_feats = last_away_game.iloc[-1].to_dict()
 
+        # --- Add Diagnostic Logging ---
+        print("\n--- DETAILED PREDICTION LOG ---")
+        print(f"Game: {away_team_full} at {home_team_full}")
+        print("\n[1] Raw Home Team Features:")
+        print(pd.Series(home_feats))
+        print("\n[2] Raw Away Team Features:")
+        print(pd.Series(away_feats))
+        
         home_city = CITY_MAP.get(home_team_standard)
         
         last_home_game_time = pd.to_datetime(home_feats['commence_time'], utc=True)
@@ -304,6 +311,11 @@ def predict(sport):
             'home_offense_vs_away_defense': get_feature(away_feats, 'pitching_rank', 15.5) - get_feature(home_feats, 'hitting_rank', 15.5),
             'away_offense_vs_home_defense': get_feature(home_feats, 'pitching_rank', 15.5) - get_feature(away_feats, 'hitting_rank', 15.5)
         }
+        
+        print("\n[3] Final Features Sent to Model:")
+        print(pd.Series(final_features))
+        print("--------------------------\n")
+
 
     elif sport == "nfl":
         if nfl_model is None or nfl_calibration_model is None or nfl_features_df is None:
