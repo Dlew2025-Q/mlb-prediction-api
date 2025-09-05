@@ -39,7 +39,6 @@ def load_pickle(path):
 mlb_model = load_pickle('mlb_total_runs_model.pkl')
 mlb_calibration_model = load_pickle('mlb_calibration_model.pkl')
 mlb_features_df = load_pickle('latest_mlb_features.pkl')
-pitcher_features_df = load_pickle('pitcher_features.pkl')
 
 nfl_model = load_pickle('nfl_total_points_model.pkl')
 nfl_calibration_model = load_pickle('nfl_calibration_model.pkl')
@@ -240,6 +239,14 @@ def predict(sport):
 
         home_feats = last_home_game.iloc[-1].to_dict()
         away_feats = last_away_game.iloc[-1].to_dict()
+        
+        # --- Add Diagnostic Logging ---
+        print("\n--- DETAILED PREDICTION LOG ---")
+        print(f"Game: {away_team_full} at {home_team_full}")
+        print("\n[1] Raw Home Team Features:")
+        print(pd.Series(home_feats))
+        print("\n[2] Raw Away Team Features:")
+        print(pd.Series(away_feats))
 
         home_city = CITY_MAP.get(home_team_standard)
         
@@ -304,6 +311,11 @@ def predict(sport):
             'home_offense_vs_away_defense': get_feature(away_feats, 'pitching_rank', 15.5) - get_feature(home_feats, 'hitting_rank', 15.5),
             'away_offense_vs_home_defense': get_feature(home_feats, 'pitching_rank', 15.5) - get_feature(away_feats, 'hitting_rank', 15.5)
         }
+        
+        print("\n[3] Final Features Sent to Model:")
+        print(pd.Series(final_features))
+        print("--------------------------\n")
+
 
     elif sport == "nfl":
         if nfl_model is None or nfl_calibration_model is None or nfl_features_df is None:
