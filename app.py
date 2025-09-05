@@ -225,7 +225,7 @@ def predict(sport):
 
     final_features = {}
     if sport == "mlb":
-        if mlb_model is None or mlb_calibration_model is None or mlb_features_df is None or pitcher_features_df is None:
+        if mlb_model is None or mlb_calibration_model is None or mlb_features_df is None:
             return jsonify({'error': 'MLB model or features not loaded.'}), 503
         
         home_team_standard = MLB_TEAM_NAME_MAP.get(home_team_full, home_team_full)
@@ -362,7 +362,7 @@ def predict(sport):
                  market_line_float = float(market_line)
                  edge = raw_prediction - market_line_float
                  
-                 # FIX: Implement the "Alpha Strategy" thresholds from the analysis
+                 # Implement the "Alpha Strategy" thresholds from the analysis
                  min_confidence = 0.35
                  min_edge = 1.5
                  
