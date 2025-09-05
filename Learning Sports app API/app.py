@@ -274,7 +274,7 @@ def predict(sport):
         
         park_factor = PARK_FACTOR_MAP.get(home_team_standard, 1.0)
 
-        # FIX: Update feature set to match the retrained model
+        # FIX: Update the feature set to match the retrained model
         final_features = {
             'rolling_avg_adj_hits_home': get_feature(home_feats, 'rolling_avg_adj_hits_home', 8.0),
             'rolling_avg_adj_homers_home': get_feature(home_feats, 'rolling_avg_adj_homers_home', 1.0),
@@ -361,7 +361,7 @@ def predict(sport):
                  market_line_float = float(market_line)
                  edge = raw_prediction - market_line_float
                  
-                 # FIX: Implement the "Alpha Strategy" thresholds
+                 # FIX: Implement the "Alpha Strategy" thresholds from the analysis
                  min_confidence = 0.35
                  min_edge = 1.5
                  
