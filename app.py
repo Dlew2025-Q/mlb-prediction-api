@@ -239,7 +239,7 @@ def predict(sport):
 
         home_feats = last_home_game.iloc[-1].to_dict()
         away_feats = last_away_game.iloc[-1].to_dict()
-        
+
         last_home_game_time = pd.to_datetime(home_feats['commence_time'], utc=True)
         last_away_game_time = pd.to_datetime(away_feats['commence_time'], utc=True)
         home_days_rest = (commence_time - last_home_game_time).days
@@ -272,35 +272,51 @@ def predict(sport):
         
         park_factor = PARK_FACTOR_MAP.get(home_team_standard, 1.0)
 
+        # FIX: Align feature set with the latest precompute script
         final_features = {
-            'rolling_avg_adj_hits_home': get_feature(home_feats, 'rolling_avg_adj_hits_home', 8.0),
-            'rolling_avg_adj_homers_home': get_feature(home_feats, 'rolling_avg_adj_homers_home', 1.0),
-            'rolling_avg_adj_walks_home': get_feature(home_feats, 'rolling_avg_adj_walks_home', 3.0),
-            'rolling_avg_adj_strikeouts_home': get_feature(home_feats, 'rolling_avg_adj_strikeouts_home', 8.0),
-            'pitcher_rolling_adj_era_home': get_feature(home_feats, 'pitcher_rolling_adj_era_home', 4.5),
-            'pitcher_rolling_whip_home': get_feature(home_feats, 'pitcher_rolling_whip_home', 1.3),
-            'pitcher_rolling_k_per_9_home': get_feature(home_feats, 'pitcher_rolling_k_per_9_home', 8.5),
+            'rolling_avg_hits_home': get_feature(home_feats, 'rolling_avg_hits_home', 8.0),
+            'rolling_avg_homers_home': get_feature(home_feats, 'rolling_avg_homers_home', 1.0),
+            'rolling_avg_walks_home': get_feature(home_feats, 'rolling_avg_walks_home', 3.0),
+            'rolling_avg_strikeouts_home': get_feature(home_feats, 'rolling_avg_strikeouts_home', 8.0),
+            'starter_rolling_era_home': get_feature(home_feats, 'starter_rolling_era_home', 4.5),
+            'starter_rolling_whip_home': get_feature(home_feats, 'starter_rolling_whip_home', 1.3),
+            'starter_rolling_k_per_9_home': get_feature(home_feats, 'starter_rolling_k_per_9_home', 8.5),
             'rolling_bullpen_era_home': get_feature(home_feats, 'rolling_bullpen_era_home', 4.5),
             'park_factor': park_factor,
             'bullpen_ip_last_3_days_home': get_feature(home_feats, 'bullpen_ip_last_3_days_home', 0.0),
-            'rolling_avg_adj_hits_away': get_feature(away_feats, 'rolling_avg_adj_hits_away', 8.0),
-            'rolling_avg_adj_homers_away': get_feature(away_feats, 'rolling_avg_adj_homers_away', 1.0),
-            'rolling_avg_adj_walks_away': get_feature(away_feats, 'rolling_avg_adj_walks_away', 3.0),
-            'rolling_avg_adj_strikeouts_away': get_feature(away_feats, 'rolling_avg_adj_strikeouts_away', 8.0),
-            'pitcher_rolling_adj_era_away': get_feature(away_feats, 'pitcher_rolling_adj_era_away', 4.5),
-            'pitcher_rolling_whip_away': get_feature(away_feats, 'pitcher_rolling_whip_away', 1.3),
-            'pitcher_rolling_k_per_9_away': get_feature(away_feats, 'pitcher_rolling_k_per_9_away', 8.5),
+            'rolling_avg_hits_away': get_feature(away_feats, 'rolling_avg_hits_away', 8.0),
+            'rolling_avg_homers_away': get_feature(away_feats, 'rolling_avg_homers_away', 1.0),
+            'rolling_avg_walks_away': get_feature(away_feats, 'rolling_avg_walks_away', 3.0),
+            'rolling_avg_strikeouts_away': get_feature(away_feats, 'rolling_avg_strikeouts_away', 8.0),
+            'starter_rolling_era_away': get_feature(away_feats, 'starter_rolling_era_away', 4.5),
+            'starter_rolling_whip_away': get_feature(away_feats, 'starter_rolling_whip_away', 1.3),
+            'starter_rolling_k_per_9_away': get_feature(away_feats, 'starter_rolling_k_per_9_away', 8.5),
             'rolling_bullpen_era_away': get_feature(away_feats, 'rolling_bullpen_era_away', 4.5),
             'bullpen_ip_last_3_days_away': get_feature(away_feats, 'bullpen_ip_last_3_days_away', 0.0),
             'home_days_rest': home_days_rest,
             'away_days_rest': away_days_rest,
             'game_of_season': game_of_season,
             'travel_factor': travel_factor,
-            'starter_era_diff': get_feature(home_feats, 'pitcher_rolling_adj_era_away', 4.5) - get_feature(home_feats, 'pitcher_rolling_adj_era_home', 4.5),
-            'bullpen_era_diff': get_feature(away_feats, 'rolling_bullpen_era_away', 4.5) - get_feature(home_feats, 'rolling_bullpen_era_home', 4.5),
-            'home_offense_vs_away_defense': get_feature(away_feats, 'pitching_rank', 15.5) - get_feature(home_feats, 'hitting_rank', 15.5),
-            'away_offense_vs_home_defense': get_feature(home_feats, 'pitching_rank', 15.5) - get_feature(away_feats, 'hitting_rank', 15.5)
+            'starter_era_diff': get_feature(away_feats, 'starter_rolling_era_away', 4.5) - get_feature(home_feats, 'starter_rolling_era_home', 4.5),
+            'bullpen_era_diff': get_feature(away_feats, 'rolling_bullpen_era_away', 4.5) - get_feature(home_feats, 'rolling_bullpen_era_home', 4.5)
         }
+        
+        # Add permanent logging
+        print("\n--- DETAILED GAME LOG ---")
+        print(f"Game: {away_team_full} at {home_team_full}")
+        print("\n[1] Raw Home Team Features (from last home game):")
+        print(pd.Series(home_feats))
+        print("\n[2] Raw Away Team Features (from last away game):")
+        print(pd.Series(away_feats))
+        print("\n[3] Dynamically Calculated Features:")
+        print(f"  - home_days_rest: {home_days_rest}")
+        print(f"  - away_days_rest: {away_days_rest}")
+        print(f"  - game_of_season: {game_of_season}")
+        print(f"  - travel_factor: {travel_factor}")
+        print(f"  - park_factor: {park_factor}")
+        print("\n[4] Final Features Sent to Model:")
+        print(pd.Series(final_features))
+
 
     elif sport == "nfl":
         if nfl_model is None or nfl_calibration_model is None or nfl_features_df is None:
@@ -348,6 +364,9 @@ def predict(sport):
 
         raw_prediction = model.predict(prediction_df)[0]
         
+        print(f"\n[5] Raw Model Prediction: {raw_prediction}")
+        print("--- END DETAILED LOG ---\n")
+        
         confidence_df = pd.DataFrame([{'raw_prediction': raw_prediction}])
         confidence_score = calibration_model.predict_proba(confidence_df.values.reshape(-1, 1))[0][1]
 
@@ -358,8 +377,9 @@ def predict(sport):
                  market_line_float = float(market_line)
                  edge = raw_prediction - market_line_float
                  
-                 min_confidence = 0.35
-                 min_edge = 1.5
+                 # Define sport-specific thresholds
+                 min_confidence = 0.15 
+                 min_edge = 1.0 if sport == 'nfl' else 0.25
                  
                  if edge > min_edge and confidence_score > min_confidence:
                      suggestion = "Over"
