@@ -247,9 +247,9 @@ def precompute_mlb_features(engine):
 
         mlb_final_df['park_factor'] = mlb_final_df['home_team'].map(PARK_FACTOR_MAP).fillna(1.0)
         
-        # FIX: Simplify matchup features
         mlb_final_df['starter_era_diff'] = mlb_final_df['starter_rolling_era_away'] - mlb_final_df['starter_rolling_era_home']
         mlb_final_df['bullpen_era_diff'] = mlb_final_df['rolling_bullpen_era_away'] - mlb_final_df['rolling_bullpen_era_home']
+
 
         print(f"Final MLB training DataFrame columns: {mlb_final_df.columns.tolist()}")
 
@@ -308,7 +308,8 @@ def precompute_mlb_features(engine):
         print(feature_importance)
         
         mlb_training_df['raw_prediction'] = mlb_model.predict(X_mlb)
-        mlb_training_df['is_accurate'] = np.where(abs(mlb_training_df['raw_prediction'] - mlb_training_df['total_runs']) <= 1.5, 1, 0)
+        # FIX: Use a dynamic, percentage-based definition of accuracy
+        mlb_training_df['is_accurate'] = np.where(abs(mlb_training_df['raw_prediction'] - mlb_training_df['total_runs']) / mlb_training_df['total_runs'] <= 0.20, 1, 0)
         
         X_cal_mlb = mlb_training_df[['raw_prediction']]
         y_cal_mlb = mlb_training_df['is_accurate']
