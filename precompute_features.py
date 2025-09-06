@@ -120,14 +120,6 @@ def precompute_mlb_features(engine):
         # --- Create all feature DataFrames ---
         print("Calculating and merging features...")
         
-        team_pitching_agg = pitcher_stats_df.groupby('team').agg(total_er=('earned_runs', 'sum'), total_ip=('innings_pitched', 'sum')).reset_index()
-        team_pitching_agg['season_era'] = (team_pitching_agg['total_er'] * 9) / (team_pitching_agg['total_ip'] + 1e-6)
-        team_pitching_agg['pitching_rank'] = team_pitching_agg['season_era'].rank(ascending=True, method='first')
-
-        team_hitting_agg = batter_stats_df.groupby('team').agg(total_hits=('hits', 'sum'), total_homers=('home_runs', 'sum'), total_at_bats=('at_bats', 'sum')).reset_index()
-        team_hitting_agg['production_score'] = (team_hitting_agg['total_hits'] + (2 * team_hitting_agg['total_homers'])) / (team_hitting_agg['total_at_bats'] + 1e-6)
-        team_hitting_agg['hitting_rank'] = team_hitting_agg['production_score'].rank(ascending=False, method='first')
-
         pitcher_stats_df_temp = pd.merge(pitcher_stats_df, games_df[['game_id', 'commence_time']], on='game_id', how='left')
         pitcher_stats_df_temp.sort_values('commence_time', inplace=True)
         
@@ -148,48 +140,30 @@ def precompute_mlb_features(engine):
 
 
         starters_df = pitcher_stats_df_temp[pitcher_stats_df_temp['innings_pitched'] >= 3.0].copy()
-        starters_df = pd.merge(starters_df, games_df[['game_id', 'home_team', 'away_team']], on='game_id', how='left')
-        starters_df['opponent_team'] = starters_df.apply(lambda row: row['home_team'] if row['team'] == row['away_team'] else row['away_team'], axis=1)
-        starters_df = pd.merge(starters_df, team_hitting_agg[['team', 'hitting_rank']].rename(columns={'team': 'opponent_team'}), on='opponent_team', how='left')
-        
-        starters_df['adj_earned_runs'] = starters_df['earned_runs'] * (1 + (15.5 - starters_df['hitting_rank']) / 100)
         
         starters_df['whip_numerator'] = starters_df['walks'] + starters_df['hits_allowed']
-        starters_df['starter_rolling_adj_era'] = starters_df.groupby('team')['adj_earned_runs'].transform(lambda x: x.shift(1).rolling(5, min_periods=1).sum()) / (starters_df.groupby('team')['innings_pitched'].transform(lambda x: x.shift(1).rolling(5, min_periods=1).sum()) + 1e-6) * 9
+        starters_df['starter_rolling_era'] = starters_df.groupby('team')['earned_runs'].transform(lambda x: x.shift(1).rolling(5, min_periods=1).sum()) / (starters_df.groupby('team')['innings_pitched'].transform(lambda x: x.shift(1).rolling(5, min_periods=1).sum()) + 1e-6) * 9
         starters_df['starter_rolling_whip'] = starters_df.groupby('team')['whip_numerator'].transform(lambda x: x.shift(1).rolling(5, min_periods=1).sum()) / (starters_df.groupby('team')['innings_pitched'].transform(lambda x: x.shift(1).rolling(5, min_periods=1).sum()) + 1e-6)
         starters_df['starter_rolling_k_per_9'] = starters_df.groupby('team')['strikeouts'].transform(lambda x: x.shift(1).rolling(5, min_periods=1).sum()) / (starters_df.groupby('team')['innings_pitched'].transform(lambda x: x.shift(1).rolling(5, min_periods=1).sum()) + 1e-6) * 9
         
         starters_agg = starters_df.groupby(['game_id', 'team']).last().reset_index()
-
-        opponent_map = pd.concat([
-            games_df[['game_id', 'home_team', 'away_team']].rename(columns={'home_team': 'team', 'away_team': 'opponent'}),
-            games_df[['game_id', 'away_team', 'home_team']].rename(columns={'away_team': 'team', 'home_team': 'opponent'})
-        ])
         
-        batter_stats_df_merged = pd.merge(batter_stats_df, opponent_map, on=['game_id', 'team'], how='left')
-        batter_stats_df_merged = pd.merge(batter_stats_df_merged, team_pitching_agg[['team', 'pitching_rank']].rename(columns={'team': 'opponent'}), on='opponent', how='left', suffixes=('', '_opponent'))
-        
-        batter_stats_df_merged['adj_hits'] = batter_stats_df_merged['hits'] * (1 + (15.5 - batter_stats_df_merged['pitching_rank']) / 100)
-        batter_stats_df_merged['adj_home_runs'] = batter_stats_df_merged['home_runs'] * (1 + (15.5 - batter_stats_df_merged['pitching_rank']) / 100)
-        batter_stats_df_merged['adj_walks'] = batter_stats_df_merged['walks'] * (1 + (15.5 - batter_stats_df_merged['pitching_rank']) / 100)
-        batter_stats_df_merged['adj_strikeouts'] = batter_stats_df_merged['strikeouts'] * (1 + (15.5 - batter_stats_df_merged['pitching_rank']) / 100)
-        
-        batter_stats_df_merged = pd.merge(batter_stats_df_merged, games_df[['game_id', 'home_team', 'away_team', 'commence_time']], on='game_id', how='left').sort_values('commence_time')
+        batter_stats_df_merged = pd.merge(batter_stats_df, games_df[['game_id', 'commence_time']], on='game_id', how='left').sort_values('commence_time')
         
         batter_agg = batter_stats_df_merged.groupby(['game_id', 'team']).agg(
-            total_adj_hits=('adj_hits', 'sum'),
-            total_adj_homers=('adj_home_runs', 'sum'),
-            total_adj_walks=('adj_walks', 'sum'),
-            total_adj_strikeouts=('adj_strikeouts', 'sum')
+            total_hits=('hits', 'sum'),
+            total_homers=('home_runs', 'sum'),
+            total_walks=('walks', 'sum'),
+            total_strikeouts=('strikeouts', 'sum')
         ).reset_index()
         batter_agg = pd.merge(batter_agg, games_df[['game_id', 'commence_time', 'home_team', 'away_team']], on='game_id', how='left').sort_values('commence_time')
         
         batter_agg['location'] = np.where(batter_agg['team'] == batter_agg['home_team'], 'Home', 'Away')
         
-        batter_agg['rolling_avg_adj_hits_loc'] = batter_agg.groupby(['team', 'location'])['total_adj_hits'].transform(lambda x: x.shift(1).rolling(10, min_periods=1).mean())
-        batter_agg['rolling_avg_adj_homers_loc'] = batter_agg.groupby(['team', 'location'])['total_adj_homers'].transform(lambda x: x.shift(1).rolling(10, min_periods=1).mean())
-        batter_agg['rolling_avg_adj_walks_loc'] = batter_agg.groupby(['team', 'location'])['total_adj_walks'].transform(lambda x: x.shift(1).rolling(10, min_periods=1).mean())
-        batter_agg['rolling_avg_adj_strikeouts_loc'] = batter_agg.groupby(['team', 'location'])['total_adj_strikeouts'].transform(lambda x: x.shift(1).rolling(10, min_periods=1).mean())
+        batter_agg['rolling_avg_hits_loc'] = batter_agg.groupby(['team', 'location'])['total_hits'].transform(lambda x: x.shift(1).rolling(10, min_periods=1).mean())
+        batter_agg['rolling_avg_homers_loc'] = batter_agg.groupby(['team', 'location'])['total_homers'].transform(lambda x: x.shift(1).rolling(10, min_periods=1).mean())
+        batter_agg['rolling_avg_walks_loc'] = batter_agg.groupby(['team', 'location'])['total_walks'].transform(lambda x: x.shift(1).rolling(10, min_periods=1).mean())
+        batter_agg['rolling_avg_strikeouts_loc'] = batter_agg.groupby(['team', 'location'])['total_strikeouts'].transform(lambda x: x.shift(1).rolling(10, min_periods=1).mean())
 
         # --- Consolidate all data into a single master DataFrame ---
         mlb_final_df = games_df.copy()
@@ -204,41 +178,41 @@ def precompute_mlb_features(engine):
         mlb_final_df['rolling_bullpen_era_home'].fillna(4.5, inplace=True)
         mlb_final_df['rolling_bullpen_era_away'].fillna(4.5, inplace=True)
         
-        starter_features_to_merge = ['game_id', 'team', 'starter_rolling_adj_era', 'starter_rolling_whip', 'starter_rolling_k_per_9']
-        mlb_final_df = pd.merge(mlb_final_df, starters_agg[starter_features_to_merge].rename(columns={'team': 'home_team', 'starter_rolling_adj_era': 'starter_rolling_adj_era_home', 'starter_rolling_whip': 'starter_rolling_whip_home', 'starter_rolling_k_per_9': 'starter_rolling_k_per_9_home'}), on=['game_id', 'home_team'], how='left')
-        mlb_final_df = pd.merge(mlb_final_df, starters_agg[starter_features_to_merge].rename(columns={'team': 'away_team', 'starter_rolling_adj_era': 'starter_rolling_adj_era_away', 'starter_rolling_whip': 'starter_rolling_whip_away', 'starter_rolling_k_per_9': 'starter_rolling_k_per_9_away'}), on=['game_id', 'away_team'], how='left')
-        mlb_final_df['starter_rolling_adj_era_home'].fillna(4.5, inplace=True)
-        mlb_final_df['starter_rolling_adj_era_away'].fillna(4.5, inplace=True)
+        starter_features_to_merge = ['game_id', 'team', 'starter_rolling_era', 'starter_rolling_whip', 'starter_rolling_k_per_9']
+        mlb_final_df = pd.merge(mlb_final_df, starters_agg[starter_features_to_merge].rename(columns={'team': 'home_team', 'starter_rolling_era': 'starter_rolling_era_home', 'starter_rolling_whip': 'starter_rolling_whip_home', 'starter_rolling_k_per_9': 'starter_rolling_k_per_9_home'}), on=['game_id', 'home_team'], how='left')
+        mlb_final_df = pd.merge(mlb_final_df, starters_agg[starter_features_to_merge].rename(columns={'team': 'away_team', 'starter_rolling_era': 'starter_rolling_era_away', 'starter_rolling_whip': 'starter_rolling_whip_away', 'starter_rolling_k_per_9': 'starter_rolling_k_per_9_away'}), on=['game_id', 'away_team'], how='left')
+        mlb_final_df['starter_rolling_era_home'].fillna(4.5, inplace=True)
+        mlb_final_df['starter_rolling_era_away'].fillna(4.5, inplace=True)
         mlb_final_df['starter_rolling_whip_home'].fillna(1.3, inplace=True)
         mlb_final_df['starter_rolling_whip_away'].fillna(1.3, inplace=True)
         mlb_final_df['starter_rolling_k_per_9_home'].fillna(8.5, inplace=True)
         mlb_final_df['starter_rolling_k_per_9_away'].fillna(8.5, inplace=True)
         
         home_batter_rolling = batter_agg[batter_agg['location'] == 'Home'].copy().rename(columns={
-            'rolling_avg_adj_hits_loc': 'rolling_avg_adj_hits_home',
-            'rolling_avg_adj_homers_loc': 'rolling_avg_adj_homers_home',
-            'rolling_avg_adj_walks_loc': 'rolling_avg_adj_walks_home',
-            'rolling_avg_adj_strikeouts_loc': 'rolling_avg_adj_strikeouts_home',
-        })[['game_id', 'home_team', 'rolling_avg_adj_hits_home', 'rolling_avg_adj_homers_home', 'rolling_avg_adj_walks_home', 'rolling_avg_adj_strikeouts_home']]
+            'rolling_avg_hits_loc': 'rolling_avg_hits_home',
+            'rolling_avg_homers_loc': 'rolling_avg_homers_home',
+            'rolling_avg_walks_loc': 'rolling_avg_walks_home',
+            'rolling_avg_strikeouts_loc': 'rolling_avg_strikeouts_home',
+        })[['game_id', 'home_team', 'rolling_avg_hits_home', 'rolling_avg_homers_home', 'rolling_avg_walks_home', 'rolling_avg_strikeouts_home']]
         
         away_batter_rolling = batter_agg[batter_agg['location'] == 'Away'].copy().rename(columns={
-            'rolling_avg_adj_hits_loc': 'rolling_avg_adj_hits_away',
-            'rolling_avg_adj_homers_loc': 'rolling_avg_adj_homers_away',
-            'rolling_avg_adj_walks_loc': 'rolling_avg_adj_walks_away',
-            'rolling_avg_adj_strikeouts_loc': 'rolling_avg_adj_strikeouts_away',
-        })[['game_id', 'away_team', 'rolling_avg_adj_hits_away', 'rolling_avg_adj_homers_away', 'rolling_avg_adj_walks_away', 'rolling_avg_adj_strikeouts_away']]
+            'rolling_avg_hits_loc': 'rolling_avg_hits_away',
+            'rolling_avg_homers_loc': 'rolling_avg_homers_away',
+            'rolling_avg_walks_loc': 'rolling_avg_walks_away',
+            'rolling_avg_strikeouts_loc': 'rolling_avg_strikeouts_away',
+        })[['game_id', 'away_team', 'rolling_avg_hits_away', 'rolling_avg_homers_away', 'rolling_avg_walks_away', 'rolling_avg_strikeouts_away']]
         
         mlb_final_df = pd.merge(mlb_final_df, home_batter_rolling, on=['game_id', 'home_team'], how='left')
         mlb_final_df = pd.merge(mlb_final_df, away_batter_rolling, on=['game_id', 'away_team'], how='left')
 
-        mlb_final_df['rolling_avg_adj_hits_home'].fillna(8.0, inplace=True)
-        mlb_final_df['rolling_avg_adj_homers_home'].fillna(1.0, inplace=True)
-        mlb_final_df['rolling_avg_adj_walks_home'].fillna(3.0, inplace=True)
-        mlb_final_df['rolling_avg_adj_strikeouts_home'].fillna(8.0, inplace=True)
-        mlb_final_df['rolling_avg_adj_hits_away'].fillna(8.0, inplace=True)
-        mlb_final_df['rolling_avg_adj_homers_away'].fillna(1.0, inplace=True)
-        mlb_final_df['rolling_avg_adj_walks_away'].fillna(3.0, inplace=True)
-        mlb_final_df['rolling_avg_adj_strikeouts_away'].fillna(8.0, inplace=True)
+        mlb_final_df['rolling_avg_hits_home'].fillna(8.0, inplace=True)
+        mlb_final_df['rolling_avg_homers_home'].fillna(1.0, inplace=True)
+        mlb_final_df['rolling_avg_walks_home'].fillna(3.0, inplace=True)
+        mlb_final_df['rolling_avg_strikeouts_home'].fillna(8.0, inplace=True)
+        mlb_final_df['rolling_avg_hits_away'].fillna(8.0, inplace=True)
+        mlb_final_df['rolling_avg_homers_away'].fillna(1.0, inplace=True)
+        mlb_final_df['rolling_avg_walks_away'].fillna(3.0, inplace=True)
+        mlb_final_df['rolling_avg_strikeouts_away'].fillna(8.0, inplace=True)
 
         all_games_for_rest = pd.melt(games_df, id_vars=['game_id', 'commence_time'], value_vars=['home_team', 'away_team'], value_name='team').sort_values('commence_time')
         all_games_for_rest['days_rest'] = all_games_for_rest.groupby('team')['commence_time'].diff().dt.days
@@ -273,15 +247,9 @@ def precompute_mlb_features(engine):
 
         mlb_final_df['park_factor'] = mlb_final_df['home_team'].map(PARK_FACTOR_MAP).fillna(1.0)
         
-        mlb_final_df = pd.merge(mlb_final_df, team_hitting_agg[['team', 'hitting_rank']].rename(columns={'team': 'home_team', 'hitting_rank': 'home_hitting_rank'}), on='home_team', how='left')
-        mlb_final_df = pd.merge(mlb_final_df, team_pitching_agg[['team', 'pitching_rank']].rename(columns={'team': 'home_team', 'pitching_rank': 'home_pitching_rank'}), on='home_team', how='left')
-        mlb_final_df = pd.merge(mlb_final_df, team_hitting_agg[['team', 'hitting_rank']].rename(columns={'team': 'away_team', 'hitting_rank': 'away_hitting_rank'}), on='away_team', how='left')
-        mlb_final_df = pd.merge(mlb_final_df, team_pitching_agg[['team', 'pitching_rank']].rename(columns={'team': 'away_team', 'pitching_rank': 'away_pitching_rank'}), on='away_team', how='left')
-
-        mlb_final_df['starter_era_diff'] = mlb_final_df['starter_rolling_adj_era_away'] - mlb_final_df['starter_rolling_adj_era_home']
+        mlb_final_df['starter_era_diff'] = mlb_final_df['starter_rolling_era_away'] - mlb_final_df['starter_rolling_era_home']
         mlb_final_df['bullpen_era_diff'] = mlb_final_df['rolling_bullpen_era_away'] - mlb_final_df['rolling_bullpen_era_home']
-        mlb_final_df['home_offense_vs_away_defense'] = mlb_final_df['away_pitching_rank'] - mlb_final_df['home_hitting_rank']
-        mlb_final_df['away_offense_vs_home_defense'] = mlb_final_df['home_pitching_rank'] - mlb_final_df['away_hitting_rank']
+
 
         print(f"Final MLB training DataFrame columns: {mlb_final_df.columns.tolist()}")
 
@@ -296,35 +264,23 @@ def precompute_mlb_features(engine):
         mlb_training_df['total_runs'] = mlb_training_df['home_score'] + mlb_training_df['away_score']
 
         mlb_model_features = [
-            'rolling_avg_adj_hits_home', 'rolling_avg_adj_homers_home', 'rolling_avg_adj_walks_home',
-            'rolling_avg_adj_strikeouts_home', 'starter_rolling_adj_era_home', 
+            'rolling_avg_hits_home', 'rolling_avg_homers_home', 'rolling_avg_walks_home',
+            'rolling_avg_strikeouts_home', 'starter_rolling_era_home', 
             'starter_rolling_whip_home', 'starter_rolling_k_per_9_home', 
             'rolling_bullpen_era_home', 'park_factor',
-            'bullpen_ip_last_3_days_home', 'rolling_avg_adj_hits_away', 'rolling_avg_adj_homers_away',
-            'rolling_avg_adj_walks_away', 'rolling_avg_adj_strikeouts_away',
-            'starter_rolling_adj_era_away', 'starter_rolling_whip_away', 'starter_rolling_k_per_9_away',
+            'bullpen_ip_last_3_days_home', 'rolling_avg_hits_away', 'rolling_avg_homers_away',
+            'rolling_avg_walks_away', 'rolling_avg_strikeouts_away',
+            'starter_rolling_era_away', 'starter_rolling_whip_away', 'starter_rolling_k_per_9_away',
             'rolling_bullpen_era_away', 'bullpen_ip_last_3_days_away',
             'home_days_rest', 'away_days_rest',
             'game_of_season', 'travel_factor',
-            'starter_era_diff', 'bullpen_era_diff', 
-            'home_offense_vs_away_defense', 'away_offense_vs_home_defense'
+            'starter_era_diff', 'bullpen_era_diff'
         ]
         
         mlb_training_df.dropna(subset=mlb_model_features + ['total_runs'], inplace=True)
         X_mlb = mlb_training_df[mlb_model_features]
         y_mlb = mlb_training_df['total_runs']
 
-        # FIX: Create weights to help the model focus on its "Under" bias
-        # First, train a temporary model to get initial predictions
-        temp_model = XGBRegressor(objective='reg:squarederror', random_state=42)
-        temp_model.fit(X_mlb, y_mlb)
-        predictions = temp_model.predict(X_mlb)
-        
-        # Now create weights: give more weight to games the model correctly predicted would go UNDER
-        errors = predictions - y_mlb
-        weights = np.where(errors > 0, 1.5, 1.0) # Give 1.5x weight to "Under" situations
-        
-        # Now, train the final model with these new weights
         mlb_model = XGBRegressor(
             objective='reg:squarederror',
             n_estimators=1000,
@@ -337,12 +293,12 @@ def precompute_mlb_features(engine):
             random_state=42,
             n_jobs=-1
         )
-        mlb_model.fit(X_mlb, y_mlb, sample_weight=weights)
+        mlb_model.fit(X_mlb, y_mlb)
 
         with open('mlb_total_runs_model.pkl', 'wb') as f:
             pickle.dump(mlb_model, f)
         
-        print("\nSuccessfully trained and saved MLB model with strategic weighting.")
+        print("\nSuccessfully trained and saved MLB model.")
         
         print("\n--- MLB Feature Importance ---")
         feature_importance = pd.DataFrame({
@@ -352,8 +308,7 @@ def precompute_mlb_features(engine):
         print(feature_importance)
         
         mlb_training_df['raw_prediction'] = mlb_model.predict(X_mlb)
-        # FIX: Use a dynamic, percentage-based definition of accuracy
-        mlb_training_df['is_accurate'] = np.where(abs(mlb_training_df['raw_prediction'] - mlb_training_df['total_runs']) / mlb_training_df['total_runs'] <= 0.20, 1, 0)
+        mlb_training_df['is_accurate'] = np.where(abs(mlb_training_df['raw_prediction'] - mlb_training_df['total_runs']) <= 1.5, 1, 0)
         
         X_cal_mlb = mlb_training_df[['raw_prediction']]
         y_cal_mlb = mlb_training_df['is_accurate']
@@ -373,7 +328,6 @@ def precompute_mlb_features(engine):
 
 def precompute_nfl_features(engine):
     print("\n--- Starting NFL Feature Pre-computation ---")
-    # ... (NFL pre-computation logic remains the same)
     try:
         nfl_games_df = pd.read_sql("SELECT * FROM nfl_games", engine)
         print("NFL data loaded successfully.")
