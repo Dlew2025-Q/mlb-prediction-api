@@ -314,6 +314,17 @@ def precompute_mlb_features(engine):
         X_mlb = mlb_training_df[mlb_model_features]
         y_mlb = mlb_training_df['total_runs']
 
+        # FIX: Create weights to help the model focus on its "Under" bias
+        # First, train a temporary model to get initial predictions
+        temp_model = XGBRegressor(objective='reg:squarederror', random_state=42)
+        temp_model.fit(X_mlb, y_mlb)
+        predictions = temp_model.predict(X_mlb)
+        
+        # Now create weights: give more weight to games the model correctly predicted would go UNDER
+        errors = predictions - y_mlb
+        weights = np.where(errors > 0, 1.5, 1.0) # Give 1.5x weight to "Under" situations
+        
+        # Now, train the final model with these new weights
         mlb_model = XGBRegressor(
             objective='reg:squarederror',
             n_estimators=1000,
@@ -326,12 +337,12 @@ def precompute_mlb_features(engine):
             random_state=42,
             n_jobs=-1
         )
-        mlb_model.fit(X_mlb, y_mlb)
+        mlb_model.fit(X_mlb, y_mlb, sample_weight=weights)
 
         with open('mlb_total_runs_model.pkl', 'wb') as f:
             pickle.dump(mlb_model, f)
         
-        print("\nSuccessfully trained and saved MLB model.")
+        print("\nSuccessfully trained and saved MLB model with strategic weighting.")
         
         print("\n--- MLB Feature Importance ---")
         feature_importance = pd.DataFrame({
@@ -341,7 +352,8 @@ def precompute_mlb_features(engine):
         print(feature_importance)
         
         mlb_training_df['raw_prediction'] = mlb_model.predict(X_mlb)
-        mlb_training_df['is_accurate'] = np.where(abs(mlb_training_df['raw_prediction'] - mlb_training_df['total_runs']) <= 1.5, 1, 0)
+        # FIX: Use a dynamic, percentage-based definition of accuracy
+        mlb_training_df['is_accurate'] = np.where(abs(mlb_training_df['raw_prediction'] - mlb_training_df['total_runs']) / mlb_training_df['total_runs'] <= 0.20, 1, 0)
         
         X_cal_mlb = mlb_training_df[['raw_prediction']]
         y_cal_mlb = mlb_training_df['is_accurate']
@@ -361,6 +373,7 @@ def precompute_mlb_features(engine):
 
 def precompute_nfl_features(engine):
     print("\n--- Starting NFL Feature Pre-computation ---")
+    # ... (NFL pre-computation logic remains the same)
     try:
         nfl_games_df = pd.read_sql("SELECT * FROM nfl_games", engine)
         print("NFL data loaded successfully.")
