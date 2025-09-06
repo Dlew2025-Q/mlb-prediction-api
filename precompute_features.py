@@ -247,9 +247,9 @@ def precompute_mlb_features(engine):
 
         mlb_final_df['park_factor'] = mlb_final_df['home_team'].map(PARK_FACTOR_MAP).fillna(1.0)
         
+        # FIX: Simplify matchup features
         mlb_final_df['starter_era_diff'] = mlb_final_df['starter_rolling_era_away'] - mlb_final_df['starter_rolling_era_home']
         mlb_final_df['bullpen_era_diff'] = mlb_final_df['rolling_bullpen_era_away'] - mlb_final_df['rolling_bullpen_era_home']
-
 
         print(f"Final MLB training DataFrame columns: {mlb_final_df.columns.tolist()}")
 
