@@ -1,0 +1,10 @@
+# Environment variables - KEEP THESE SECRET
+.env
+
+# Python cache and compiled files
+__pycache__/
+*.pyc
+
+# IDE and editor specific files
+.vscode/
+.idea/
